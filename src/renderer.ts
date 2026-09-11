@@ -393,6 +393,7 @@ export function createRenderer(
   canvas: HTMLCanvasElement,
   imageUrl: string,
   onError: (message: string) => void,
+  onFrame?: () => void,
 ): Renderer {
   let gl: GL | null = null;
   let sceneProgram: WebGLProgram | null = null;
@@ -664,6 +665,9 @@ export function createRenderer(
     }
     gl.bindTexture(gl.TEXTURE_2D, null);
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    // Consume the completed frame synchronously before the browser discards
+    // this canvas's non-preserved drawing buffer (the desktop model texture).
+    onFrame?.();
   }
 
   try {

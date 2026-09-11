@@ -1,0 +1,2 @@
+# Preserve the supplied model assets byte-for-byte on every platform.
+public/models/iphone-17-pro-max/** -text

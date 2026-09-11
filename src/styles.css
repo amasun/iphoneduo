@@ -117,3 +117,12 @@ body.immersive-viewport-active #root{position:relative;z-index:0;width:100%;heig
 .controls .switch.on>span{background:#24301e}
 :is(.controls,.simulation-panel,.intro-card) :is(button,a,input,summary):focus-visible{outline-color:var(--panel-accent)}
 .controls :is(.subtle-reset,.panel-close):hover{color:#fff;background:#ffffff0d;border-radius:6px}
+
+/* Keep the compositor measurable while the glTF supplies the visible chassis. */
+.phone-model-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;z-index:2;visibility:hidden}
+.model-ready .phone-model-canvas{visibility:visible}
+.model-ready .device{opacity:0;aspect-ratio:auto;pointer-events:none}
+.model-ready .screen{height:auto;aspect-ratio:var(--model-screen-aspect);border:0}
+.model-credit{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;padding:10px 12px;font-size:9px;line-height:1.5;color:#626b5a;border-top:1px solid #d5dacc}
+.model-credit a:hover{text-decoration:underline}
+.model-load-notice{padding:8px 16px 12px;text-align:center;font-size:11px;color:#626b5a}

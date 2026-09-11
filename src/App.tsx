@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties, type Poin
 import { ArrowDown, ArrowUpRight, ChevronDown, Crosshair, Expand, Hand, Layers3, Maximize2, MoveUpRight, Pause, Play, RotateCcw, Settings2, Smartphone, Sparkles, X } from 'lucide-react';
 import { axisRotation, horizontalCorrectionDegrees, interpolateRotation, matrixToCss3d, signedYawDegrees } from './orientation';
 import { createRenderer } from './renderer';
+import type { PhoneModelRenderer } from './phoneModelRenderer';
 import { DEFAULT_EFFECT_SETTINGS, effectAtAngle, MAX_BLUR, type EffectSettings } from './effect';
 import { useOrientation } from './useOrientation';
 import { useImmersiveViewport } from './useImmersiveViewport';
@@ -58,10 +59,15 @@ export default function App() {
   const [playing, setPlaying] = useState(false);
   const [enabled, setEnabled] = useState(true);
   const [rendererError, setRendererError] = useState('');
+  const [modelAspect, setModelAspect] = useState<number | null>(null);
+  const [modelError, setModelError] = useState('');
   const [reducedMotion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const [metrics, setMetrics] = useState({ angle: 0, depth: 0, blur: 0, progress: 0, hinge: 'left' as 'left' | 'right' });
   const sensor = useOrientation();
   const canvas = useRef<HTMLCanvasElement>(null);
+  const modelCanvas = useRef<HTMLCanvasElement>(null);
+  const phoneModel = useRef<PhoneModelRenderer | null>(null);
+  const modelRevision = useRef(0);
   const device = useRef<HTMLDivElement>(null);
   const fallback = useRef<HTMLImageElement>(null);
   const engine = useRef<ReturnType<typeof createRenderer> | null>(null);
@@ -109,7 +115,7 @@ export default function App() {
   useEffect(() => {
     if (!canvas.current) return;
     try {
-      engine.current = createRenderer(canvas.current, WALLPAPER_URL, setRendererError);
+      engine.current = createRenderer(canvas.current, WALLPAPER_URL, setRendererError, () => phoneModel.current?.updateScreen());
     } catch {
       setRendererError('当前设备不支持 WebGL，已切换基础模糊。');
     }
@@ -117,6 +123,42 @@ export default function App() {
     observer.observe(canvas.current);
     return () => { observer.disconnect(); engine.current?.dispose(); engine.current = null; };
   }, []);
+
+  useEffect(() => {
+    setModelAspect(null);
+    setModelError('');
+    if (immersive || !canvas.current || !modelCanvas.current || rendererError) return;
+    let cancelled = false;
+    let model: PhoneModelRenderer | null = null;
+    const output = modelCanvas.current;
+    const source = canvas.current;
+    // The actual phone uses its own chassis: only framed previews load Three
+    // and the original glTF assets.
+    void import('./phoneModelRenderer').then(({ createPhoneModelRenderer }) => {
+      if (cancelled) return;
+      model = createPhoneModelRenderer(output, source, `${BASE_URL}models/iphone-17-pro-max/scene.gltf`, {
+        onReady: ({ screenAspect }) => {
+          if (cancelled) return;
+          setModelAspect(screenAspect);
+          modelRevision.current++;
+        },
+        onError: () => {
+          if (cancelled) return;
+          setModelAspect(null);
+          setModelError('3D 模型暂时不可用，已显示基础外框。');
+        },
+      });
+      phoneModel.current = model;
+      modelRevision.current++;
+    }).catch(() => {
+      if (!cancelled) setModelError('3D 模型暂时不可用，已显示基础外框。');
+    });
+    return () => {
+      cancelled = true;
+      if (phoneModel.current === model) phoneModel.current = null;
+      model?.dispose();
+    };
+  }, [immersive, rendererError]);
 
   useEffect(() => {
     let frame = 0;
@@ -162,8 +204,29 @@ export default function App() {
       // At 100%, the observer follows the exact horizontal angle, including
       // turns above 45 degrees; pitch stays excluded from the whole scene.
       const viewerRotation = compensatedViewerRotation(angle, 0, s.compensation);
-      const signature = [...rotation, ...viewerRotation, amount.blur, amount.dim, scale, perspective, s.perspectiveStrength, Number(s.immersive), Number(hinge === 'right')];
+      const stageElement = device.current?.parentElement;
+      const signature = [...rotation, ...viewerRotation, amount.blur, amount.dim, scale, perspective, s.perspectiveStrength, Number(s.immersive), Number(hinge === 'right'), modelRevision.current,
+        stageElement?.clientWidth ?? 0, stageElement?.clientHeight ?? 0, canvas.current?.clientHeight ?? 0,
+        device.current?.offsetLeft ?? 0, device.current?.offsetTop ?? 0];
       if (signature.some((value, i) => Math.abs(value - (previousDraw[i] ?? Infinity)) > 0.00001)) {
+        if (!s.immersive && phoneModel.current && canvas.current && stageElement) {
+          // Layout offsets exclude the CSS fallback's rotation, so the real
+          // model receives neutral display bounds and rotates exactly once.
+          let left = 0;
+          let top = 0;
+          let element: HTMLElement | null = canvas.current;
+          while (element && element !== stageElement) {
+            left += element.offsetLeft;
+            top += element.offsetTop;
+            const parent = element.offsetParent as HTMLElement | null;
+            if (parent) { left += parent.clientLeft; top += parent.clientTop; }
+            element = parent;
+          }
+          phoneModel.current.setView({
+            rotation: transpose(physicalRotation), perspective,
+            screenRect: { left, top, width: canvas.current.clientWidth, height: canvas.current.clientHeight },
+          });
+        }
         engine.current?.render({ rotation, viewerRotation, hinge, blur: amount.blur * scale, dim: amount.dim, perspective, perspectiveStrength: s.perspectiveStrength });
         previousDraw = signature;
         if (device.current) {
@@ -271,7 +334,7 @@ export default function App() {
     <main className="workspace">
       <section className="preview-panel" aria-label="空间效果预览">
         <div className="preview-heading"><span className="eyebrow">BEYOND THE SURFACE</span><h1>屏幕之内，<br /><span>视线之外。</span></h1><p>转动手机，让画面退入屏幕。</p></div>
-        <div className="stage" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={finishGesture} onPointerCancel={cancelGesture} onLostPointerCapture={() => { if (tap.current) cancelGesture(); }}>
+        <div className={`stage ${!immersive && modelAspect ? 'model-ready' : ''}`} style={modelAspect ? { '--model-screen-aspect': modelAspect } as CSSProperties : undefined} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={finishGesture} onPointerCancel={cancelGesture} onLostPointerCapture={() => { if (tap.current) cancelGesture(); }}>
           <div className="stage-orbit orbit-one" aria-hidden="true" /><div className="stage-orbit orbit-two" aria-hidden="true" />
           <div className="stage-label" aria-hidden="true"><span className="cross-mark">+</span><span>LIVE<br />PERSPECTIVE</span></div>
           <div className="device-shadow" aria-hidden="true" />
@@ -283,9 +346,12 @@ export default function App() {
               <div className="screen-glass" aria-hidden="true" />
             </div>
           </div>
+          {!immersive && <canvas ref={modelCanvas} className="phone-model-canvas" role="img" aria-label="可旋转的 iPhone 17 Pro Max 三维模型，屏幕实时呈现倾斜效果" aria-hidden={!modelAspect} />}
           <div className="stage-caption"><Hand size={15} /><span>拖动手机，探索不同角度</span><span className="caption-separator" /> <span>或使用下方角度滑杆</span></div>
         </div>
         <div className="preview-footer"><span><span className={`tiny-dot ${isConnected ? 'live' : ''}`} />{statusNames[sensor.status]}</span><button onClick={() => { setImmersive(true); setPanelOpen(false); setControlsVisible(!isMobilePreview()); }}><Expand size={15} />沉浸体验<ArrowUpRight size={14} /></button></div>
+        {!immersive && <div className="model-credit"><a href="https://sketchfab.com/3d-models/iphone-17-pro-max-87fc1df741384124a8ce0226d2b2058d" target="_blank" rel="noreferrer">iPhone 17 Pro Max</a><span>·</span><a href="https://sketchfab.com/MG990" target="_blank" rel="noreferrer">MajdyModels</a><span>·</span><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a><span>· 实时屏幕改编</span></div>}
+        {!immersive && modelError && <p className="model-load-notice" role="status">{modelError}</p>}
       </section>
 
       {showImmersiveUi && <div className="immersive-toolbar">
