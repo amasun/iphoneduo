@@ -54,7 +54,7 @@ function Range({ label, value, min, max, step = 1, unit, onChange, hint, disable
 export default function App() {
   const [immersive, setImmersive] = useState(startsImmersive);
   const [controlsVisible, setControlsVisible] = useState(() => !isMobilePreview());
-  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(() => !startsImmersive());
   const [intro, setIntro] = useState(true);
   const [settings, setSettings] = useState<EffectSettings>({ ...DEFAULT_EFFECT_SETTINGS });
   const [calibration, setCalibration] = useState(initialCalibration);
