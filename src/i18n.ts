@@ -9,6 +9,7 @@ const ENGLISH_TRANSLATIONS: Readonly<Record<string, string>> = {
   '倾斜手机，看画面停留在视线里，再退入屏幕深处。一个可以亲手体验的空间视觉实验。': 'Tilt your phone, keep the image in view, then let it recede into the screen. An interactive spatial visual experiment.',
 
   '手动模拟': 'Manual simulation',
+  '模拟 iPhone Duo 翻盖效果': 'iPhone Duo flip simulation',
   '等待授权': 'Waiting for permission',
   '等待体感': 'Waiting for motion',
   '体感已连接': 'Motion connected',

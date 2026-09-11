@@ -23,7 +23,6 @@ const DEFAULT_PERSPECTIVE_STRENGTH = 0.5;
 const DEFAULT_DIMMING_STRENGTH = 1;
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 const transpose = (m: number[]) => [m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]];
-const statusNames = { idle: '手动模拟', requesting: '等待授权', waiting: '等待体感', active: '体感已连接', denied: '未获授权', unavailable: '手动模拟', insecure: '需要 HTTPS', error: '连接未完成' };
 const MOBILE_PREVIEW_QUERY = '(max-width: 759px), (max-height: 759px) and (hover: none) and (pointer: coarse)';
 
 function isMobilePreview() {
@@ -401,7 +400,7 @@ export default function App() {
           </div>
           {!immersive && <canvas ref={modelCanvas} className="phone-model-canvas" role="img" aria-label={t('可旋转的 iPhone 17 Pro Max 三维模型，屏幕实时呈现倾斜效果')} aria-hidden={!modelAspect} />}
         </div>
-        <div className="preview-footer"><span><span className={`tiny-dot ${isConnected ? 'live' : ''}`} />{t(statusNames[sensor.status])}</span><button onClick={() => { setImmersive(true); setPanelOpen(false); setControlsVisible(!isMobilePreview()); }}><Expand size={16} />{t('iPhone 预览')}</button><button className="dashboard-settings" onClick={() => setPanelOpen(value => !value)} aria-label={t('打开效果调节')} aria-expanded={panelOpen} aria-controls="controls"><Settings2 size={18} /><span>{t('调节')}</span></button></div>
+        <div className="preview-footer"><span><span className={`tiny-dot ${isConnected ? 'live' : ''}`} />{t('模拟 iPhone Duo 翻盖效果')}</span><button onClick={() => { setImmersive(true); setPanelOpen(false); setControlsVisible(!isMobilePreview()); }}><Expand size={16} />{t('iPhone 预览')}</button><button className="dashboard-settings" onClick={() => setPanelOpen(value => !value)} aria-label={t('打开效果调节')} aria-expanded={panelOpen} aria-controls="controls"><Settings2 size={18} /><span>{t('调节')}</span></button></div>
 
         {!immersive && modelError && <p className="model-load-notice" role="status">{t(modelError)}</p>}
       </section>
