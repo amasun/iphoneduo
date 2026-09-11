@@ -89,14 +89,31 @@ function independentOrientationMatrix(
   return multiply(multiply(multiply(rotationZ(alpha), rotationX(beta)), rotationY(gamma)), rotationZ(-screenAngle));
 }
 
-function expectedEyeDirection(
+function expectedRelativeForward(
   calibration: [number, number, number],
   current: [number, number, number],
   screenAngle: number,
 ): Vec3 {
   const reference = independentOrientationMatrix(...calibration, screenAngle);
   const pose = independentOrientationMatrix(...current, screenAngle);
-  return normalize(transform(multiply(transpose(pose), reference), [0, 0, 1]));
+  // The physical relative pose is calibration^-1 * current. Keep this
+  // independent from production orientation code so axis/order regressions
+  // remain visible in the browser fixture.
+  return normalize(transform(multiply(transpose(reference), pose), [0, 0, 1]));
+}
+
+function expectedHorizontalYaw(
+  calibration: [number, number, number],
+  current: [number, number, number],
+  screenAngle: number,
+): number {
+  const normal = expectedRelativeForward(calibration, current, screenAngle);
+  const heading = Math.atan2(normal[0], normal[2]) * 180 / Math.PI;
+  return clamp(-heading, -80, 80);
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.max(minimum, Math.min(maximum, value));
 }
 
 function angularDifference(first: number, second: number): number {
@@ -104,14 +121,10 @@ function angularDifference(first: number, second: number): number {
   return Math.abs(wrapped);
 }
 
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.max(minimum, Math.min(maximum, value));
-}
-
 /**
  * Keep this model independent from production compensation.ts. The expected
- * camera follows the same bounded two-axis response used by the App while the
- * test remains able to catch a helper that is wired with the wrong axis/order.
+ * camera follows the same bounded yaw response used by the App while the test
+ * remains able to catch a helper that is wired with the wrong axis/order.
  */
 function compensatedAxis(degrees: number, strength: number): number {
   const scaled = clamp(degrees, -80, 80) * clamp(strength, 0, 1);
@@ -128,15 +141,6 @@ function compensatedViewerRotation(yaw: number, pitch: number, strength: number)
 
 function compensatedCamera(yaw: number, pitch: number, strength: number, distance: number): Vec3 {
   return transform(compensatedViewerRotation(yaw, pitch, strength), [0, 0, distance]);
-}
-
-function directionAngles(direction: Vec3): { yaw: number; pitch: number } {
-  const [x, y, z] = normalize(direction);
-  const horizontalLength = Math.hypot(x, z);
-  return {
-    yaw: horizontalLength < 0.000001 ? 0 : Math.atan2(x, z) * 180 / Math.PI,
-    pitch: Math.atan2(-y, horizontalLength) * 180 / Math.PI,
-  };
 }
 
 function maxDifference(actual: readonly number[], expected: readonly number[]): number {
@@ -476,24 +480,24 @@ export async function runPreviewChecks() {
     const sensorReadings: Array<[string, [number, number, number]]> = [
       ['forward', [35, 70, 10]],
       ['mirror', [-35, 70, -10]],
-      // Pure beta change leaves the single-axis UI neutral while the observer
-      // camera follows pitch.
+      // Pure beta change must leave both the one-axis UI and the observer
+      // camera neutral: the live preview intentionally ignores phone pitch.
       ['pitch', [0, 70, 0]],
       // This is a true local roll around the calibrated screen normal. It
-      // must leave the eye at +Z and the single-axis UI at neutral.
+      // must leave the horizontal heading and camera at neutral.
       ['roll', [90, 80, -90]],
       // Keep an alpha-only case as a separate non-zero yaw before reset.
       ['yaw', [10, 90, 0]],
       ['reset', calibration],
     ];
     for (const [name, reading] of sensorReadings) {
-      const expectedPoseDirection = expectedEyeDirection(calibration, reading, screenAngle);
-      const poseAngles = directionAngles(expectedPoseDirection);
-      const expectedYaw = clamp(poseAngles.yaw, -80, 80);
-      const expectedPitch = poseAngles.pitch;
+      const expectedPoseDirection = expectedRelativeForward(calibration, reading, screenAngle);
+      const expectedYaw = expectedHorizontalYaw(calibration, reading, screenAngle);
       const compensationStrength = Number(compensationInput.value) / 100;
       const expectedPlane = rotationY(expectedYaw);
-      const expectedCamera = compensatedCamera(expectedYaw, expectedPitch,
+      // Only the horizontal relative heading drives the camera. In
+      // particular, its y component must remain zero for every sensor pose.
+      const expectedCamera = compensatedCamera(expectedYaw, 0,
         compensationStrength, expectedDistance);
       const expectedSignature = [...expectedPlane, ...expectedCamera];
       const expectedGeometryChange = lastExpectedSignature === null
@@ -550,11 +554,67 @@ export async function runPreviewChecks() {
       if (actualCameraError > 3) {
         throw new Error(`Sensor ${name}: compensated camera error ${actualCameraError.toFixed(2)}px`);
       }
+      if (Math.abs(draw.camera[1]) > 0.01) {
+        throw new Error(`Sensor ${name}: camera responded to phone pitch (${draw.camera[1].toFixed(3)}px)`);
+      }
       sensorResults.push({ name, reading, expectedDirection, actualDirection, directionError,
-        expectedPoseDirection, expectedYaw, expectedPitch, actualYaw, uiSingleAxisError,
+        expectedPoseDirection, expectedYaw, expectedPitch: 0, actualYaw, uiSingleAxisError,
         compensationStrength, expectedCamera, actualCamera: draw.camera, actualCameraError,
         expectedDistance, actualDistance, distanceError, expectedGeometryChange });
       lastExpectedSignature = expectedSignature;
+    }
+
+    // Hold a non-zero left or right heading while changing only beta. The
+    // relative forward vector can gain a vertical component, but its
+    // horizontal heading must stay fixed; neither the plane nor the camera
+    // may follow those pitch changes.
+    const pitchInvariantResults: Record<string, unknown>[] = [];
+    let pitchInvariantPreviousSignature = [...IDENTITY, 0, 0, expectedDistance];
+    for (const yawSign of [35, -35]) {
+      let baselinePlane: number[] | null = null;
+      let baselineCamera: Vec3 | null = null;
+      for (const beta of [55, 70, 90, 110, 125]) {
+        const reading: [number, number, number] = [yawSign, beta, 0];
+        const expectedYaw = expectedHorizontalYaw(calibration, reading, screenAngle);
+        const expectedPlane = rotationY(expectedYaw);
+        const expectedCamera = compensatedCamera(expectedYaw, 0,
+          Number(compensationInput.value) / 100, expectedDistance);
+        const expectedSignature = [...expectedPlane, ...expectedCamera];
+        const expectedGeometryChange = maxDifference(expectedSignature, pitchInvariantPreviousSignature) > 0.0001;
+        const before = state.draws.length;
+        dispatchOrientation(reading);
+        if (expectedGeometryChange) {
+          await waitFor(() => state.draws.length > before,
+            `Pitch invariance ${yawSign}/${beta}: orientation event caused no scene draw`);
+          await wait(120);
+        } else {
+          await wait(80);
+        }
+        const draw = state.draws[state.draws.length - 1];
+        const planeError = maxDifference(draw.rotation, expectedPlane);
+        const cameraError = maxDifference(draw.camera, expectedCamera);
+        const yawError = angularDifference(yawDegrees(draw.rotation), expectedYaw);
+        if (planeError > 0.003 || cameraError > 3 || yawError > 1.5) {
+          throw new Error(`Pitch invariance ${yawSign}/${beta}: changed pose (plane ${planeError.toFixed(4)}, camera ${cameraError.toFixed(2)}, yaw ${yawError.toFixed(2)}°)`);
+        }
+        if (Math.abs(draw.camera[1]) > 0.01) {
+          throw new Error(`Pitch invariance ${yawSign}/${beta}: camera y changed to ${draw.camera[1].toFixed(3)}px`);
+        }
+        if (baselinePlane && maxDifference(draw.rotation, baselinePlane) > 0.003) {
+          throw new Error(`Pitch invariance ${yawSign}/${beta}: plane changed while beta changed`);
+        }
+        if (baselineCamera && maxDifference(draw.camera, baselineCamera) > 3) {
+          throw new Error(`Pitch invariance ${yawSign}/${beta}: camera changed while beta changed`);
+        }
+        if (Math.abs(Math.abs(expectedYaw) - 35) > 0.2) {
+          throw new Error(`Pitch invariance ${yawSign}/${beta}: expected horizontal heading ${expectedYaw.toFixed(2)}°`);
+        }
+        baselinePlane = [...draw.rotation];
+        baselineCamera = [...draw.camera];
+        pitchInvariantPreviousSignature = expectedSignature;
+        pitchInvariantResults.push({ yawSign, beta, expectedYaw, planeError, cameraError,
+          cameraY: draw.camera[1], actualYaw: yawDegrees(draw.rotation) });
+      }
     }
 
     // Hold one mixed sensor pose and vary only the stretch compensation. The
@@ -562,10 +622,7 @@ export async function runPreviewChecks() {
     // and 100%. This also proves that compensation is a separate control from
     // the effect presets exercised above.
     const sweepReading: [number, number, number] = [35, 70, 10];
-    const sweepDirection = expectedEyeDirection(calibration, sweepReading, screenAngle);
-    const sweepAngles = directionAngles(sweepDirection);
-    const sweepYaw = clamp(sweepAngles.yaw, -80, 80);
-    const sweepPitch = sweepAngles.pitch;
+    const sweepYaw = expectedHorizontalYaw(calibration, sweepReading, screenAngle);
     const sweepPlane = rotationY(sweepYaw);
     const stretchResults: Record<string, unknown>[] = [];
     let previousStretchCamera: Vec3 | null = null;
@@ -577,7 +634,7 @@ export async function runPreviewChecks() {
       setRangeValue(frameWindow, compensationInput, value);
       await waitFor(() => compensationInput.value === String(value),
         `Stretch compensation slider did not accept ${value}%`);
-      const expectedCamera = compensatedCamera(sweepYaw, sweepPitch, value / 100, expectedDistance);
+      const expectedCamera = compensatedCamera(sweepYaw, 0, value / 100, expectedDistance);
       await waitFor(() => state.draws.length > before,
         `Stretch compensation ${value}% caused no scene draw`);
       await wait(120);
@@ -600,9 +657,8 @@ export async function runPreviewChecks() {
     const highAngleResults: Record<string, unknown>[] = [];
     for (const alpha of [-80, -70, 70, 80]) {
       const reading: [number, number, number] = [alpha, 90, 0];
-      const angles = directionAngles(expectedEyeDirection(calibration, reading, screenAngle));
-      const yaw = clamp(angles.yaw, -80, 80);
-      const expectedCamera = compensatedCamera(yaw, angles.pitch, 1, expectedDistance);
+      const yaw = expectedHorizontalYaw(calibration, reading, screenAngle);
+      const expectedCamera = compensatedCamera(yaw, 0, 1, expectedDistance);
       const before = state.draws.length;
       dispatchOrientation(reading);
       await waitFor(() => state.draws.length > before,
@@ -640,7 +696,8 @@ export async function runPreviewChecks() {
     await waitFor(() => compensationInput.value === '100',
       'Effect reset did not restore 100% compensation');
 
-    return { framed: results, sensor: sensorResults, stretch: stretchResults,
+    return { framed: results, sensor: sensorResults, pitchInvariant: pitchInvariantResults,
+      stretch: stretchResults,
       highAngle: highAngleResults, resetCompensation: Number(compensationInput.value),
       neutralCamera: neutralDraw.camera, neutralPlaneError };
   } finally {

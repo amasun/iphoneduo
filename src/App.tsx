@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { ArrowDown, ArrowUpRight, Check, ChevronDown, Crosshair, Expand, Hand, Layers3, Maximize2, MoveUpRight, Pause, Play, RotateCcw, Settings2, Smartphone, Sparkles, X } from 'lucide-react';
-import { axisRotation, interpolateRotation, matrixToCss3d, scaleRotation, signedYawDegrees, viewerAngles } from './orientation';
+import { axisRotation, horizontalCorrectionDegrees, interpolateRotation, matrixToCss3d, scaleRotation, signedYawDegrees } from './orientation';
 import { createRenderer } from './renderer';
 import { effectAtAngle, MAX_BLUR, profiles, type EffectSettings } from './effect';
 import { useOrientation } from './useOrientation';
@@ -119,10 +119,10 @@ export default function App() {
       const s = frameState.current;
       if (s.playing) demoTime += dt;
       const demoYaw = s.playing ? Math.sin(demoTime * 0.75) * 42 : s.yaw;
-      // Keep image rotation and viewing compensation separate. Only horizontal
-      // pose rotates the image; observer elevation participates in perspective.
-      const observer = s.sensorActive ? viewerAngles(sensor.correction.current) : { yaw: -demoYaw, pitch: 0 };
-      const targetYaw = clamp(observer.yaw, -80, 80);
+      // Use only horizontal phone heading for both the plane and its observer.
+      // Pitch must not shift the camera or contaminate yaw during a side turn.
+      const horizontalYaw = s.sensorActive ? horizontalCorrectionDegrees(sensor.correction.current) : -demoYaw;
+      const targetYaw = clamp(horizontalYaw, -80, 80);
       const target = axisRotation(0, targetYaw);
       // Follow the sensor directly so the hinged plane does not lag the hand.
       pose.current = s.sensorActive ? target : interpolateRotation(pose.current, target, s.reducedMotion ? 1 : 1 - Math.exp(-dt / 0.065));
@@ -145,7 +145,7 @@ export default function App() {
       const physicalRotation = pose.current;
       // Adjustable compensation restores apparent width with a smooth limit
       // at high angles. The same camera rule applies to each preview.
-      const viewerRotation = compensatedViewerRotation(angle, observer.pitch, s.compensation);
+      const viewerRotation = compensatedViewerRotation(angle, 0, s.compensation);
       const signature = [...rotation, ...viewerRotation, amount.blur, amount.dim, scale, perspective, Number(s.immersive), Number(hinge === 'right')];
       if (signature.some((value, i) => Math.abs(value - (previousDraw[i] ?? Infinity)) > 0.00001)) {
         engine.current?.render({ rotation, viewerRotation, hinge, blur: amount.blur * scale, dim: amount.dim, perspective });

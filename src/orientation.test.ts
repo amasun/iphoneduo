@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   axisRotation,
+  horizontalCorrectionDegrees,
   interpolateRotation,
   matrixToCss3d,
   orientationMatrix,
@@ -199,6 +200,40 @@ test("viewerAngles remains local after non-zero calibration", () => {
     const reconstructed = transformVector(axisRotation(angles.pitch, angles.yaw), [0, 0, 1]);
     for (let component = 0; component < 3; component += 1) {
       assertClose(reconstructed[component], expected[component], 1e-8);
+    }
+  }
+});
+
+test("horizontal correction ignores pitch and roll while retaining the same side turn", () => {
+  for (const yaw of [-70, -35, 0, 35, 70]) {
+    for (const pitch of [-70, -30, 0, 30, 70]) {
+      for (const roll of [-35, 0, 35]) {
+        const physical = multiply3(axisRotation(pitch, yaw), rotationZ(roll));
+        assertClose(horizontalCorrectionDegrees(transposeRotation(physical)), -yaw);
+      }
+    }
+  }
+});
+
+test("horizontal correction remains independent of local pitch after arbitrary calibration", () => {
+  for (const screenAngle of [-90, 0, 90]) {
+    const reference = orientationMatrix({ alpha: 123, beta: 68, gamma: 17 }, screenAngle);
+    assertClose(horizontalCorrectionDegrees(relativeInverse(reference, reference)), 0);
+    for (const yaw of [-45, 0, 45]) {
+      for (const pitch of [-60, 0, 60]) {
+        const current = multiply3(reference, axisRotation(pitch, yaw));
+        assertClose(horizontalCorrectionDegrees(relativeInverse(current, reference)), -yaw);
+      }
+    }
+  }
+});
+
+test("portrait sensor beta changes do not alter a held horizontal turn", () => {
+  const reference = orientationMatrix({ alpha: 0, beta: 90, gamma: 0 });
+  for (const alpha of [-55, -35, 0, 35, 55]) {
+    for (const beta of [35, 55, 70, 90, 110, 125, 145]) {
+      const current = orientationMatrix({ alpha, beta, gamma: 0 });
+      assertClose(horizontalCorrectionDegrees(relativeInverse(current, reference)), -alpha);
     }
   }
 });

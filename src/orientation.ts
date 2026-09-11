@@ -250,6 +250,18 @@ export function viewerAngles(
 }
 
 /**
+ * Isolate the phone's horizontal heading in the calibrated screen frame,
+ * then reverse that scalar angle for the UI. Decomposing the inverse normal
+ * instead would let local pitch change the apparent yaw during a side turn.
+ * Local pitch and roll are discarded before either plane or camera is built.
+ */
+export function horizontalCorrectionDegrees(correction: readonly number[]): number {
+  assertMatrix(correction, "correction");
+  const yaw = viewerAngles(transpose3(correction)).yaw;
+  return yaw === 0 ? 0 : -yaw;
+}
+
+/**
  * Build a manual test rotation. Positive pitch rotates around x and positive
  * yaw around y. Yaw is applied in world coordinates after pitch:
  * `Ry(yaw) * Rx(pitch)`.
