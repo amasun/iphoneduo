@@ -9,7 +9,7 @@ export const MAX_BLUR = 120;
 export const profiles: Record<string, EffectSettings> = {
   gentle: { gain: 0.85, threshold: 16, maxAngle: 28, blur: 16 },
   balanced: { gain: 1, threshold: 10, maxAngle: 45, blur: 48 },
-  deep: { gain: 1.1, threshold: 5, maxAngle: 60, blur: 96 },
+  deep: { gain: 1.1, threshold: 5, maxAngle: 60, blur: 36 },
 };
 export function effectAtAngle(angle: number, settings: EffectSettings) {
   const linear = Math.max(0, Math.min(1, (Math.abs(angle) - settings.threshold) / (52 - settings.threshold)));
