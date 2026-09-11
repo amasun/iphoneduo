@@ -123,16 +123,11 @@ function angularDifference(first: number, second: number): number {
 
 /**
  * Keep this model independent from production compensation.ts. The expected
- * camera follows the same bounded yaw response used by the App while the test
- * remains able to catch a helper that is wired with the wrong axis/order.
+ * observer follows the same linear yaw response used by the App while the
+ * test remains able to catch a helper wired with the wrong axis/order.
  */
 function compensatedAxis(degrees: number, strength: number): number {
-  const scaled = clamp(degrees, -80, 80) * clamp(strength, 0, 1);
-  const magnitude = Math.abs(scaled);
-  const limited = magnitude <= 45
-    ? magnitude
-    : 45 + 20 * (1 - Math.exp(-(magnitude - 45) / 20));
-  return Math.sign(scaled) * limited;
+  return clamp(degrees, -80, 80) * clamp(strength, 0, 1);
 }
 
 function compensatedViewerRotation(yaw: number, pitch: number, strength: number): number[] {
@@ -335,12 +330,26 @@ export async function runPreviewChecks() {
 
     const yawInput = frameDocument.querySelector<HTMLInputElement>('#range-左右倾斜');
     const compensationInput = frameDocument.querySelector<HTMLInputElement>('#range-拉伸补偿');
+    const distanceInput = frameDocument.querySelector<HTMLInputElement>('#range-透视距离');
+    const screenShortInput = frameDocument.querySelector<HTMLInputElement>('#range-屏幕短边');
     const stage = frameDocument.querySelector<HTMLElement>('.stage');
     const device = frameDocument.querySelector<HTMLElement>('.device');
-    if (!yawInput || !compensationInput || !stage || !device) throw new Error('Preview App controls are incomplete');
+    if (!yawInput || !compensationInput || !distanceInput || !screenShortInput || !stage || !device) {
+      throw new Error('Preview App controls are incomplete');
+    }
+    if (yawInput.min !== '-80' || yawInput.max !== '80') {
+      throw new Error(`Manual yaw range is not -80..80: ${yawInput.min}..${yawInput.max}`);
+    }
     if (compensationInput.min !== '0' || compensationInput.max !== '100'
       || compensationInput.value !== '100') {
       throw new Error(`Stretch compensation range is not the default 0..100/100: ${compensationInput.min}..${compensationInput.max}/${compensationInput.value}`);
+    }
+    if (distanceInput.min !== '20' || distanceInput.max !== '100' || distanceInput.value !== '50') {
+      throw new Error(`Viewing distance range is not the default 20..100/50: ${distanceInput.min}..${distanceInput.max}/${distanceInput.value}`);
+    }
+    if (screenShortInput.min !== '5' || screenShortInput.max !== '10'
+      || screenShortInput.step !== '0.01' || screenShortInput.value !== '6.51') {
+      throw new Error(`Screen short-edge calibration is not 5..10/0.01/6.51: ${screenShortInput.min}..${screenShortInput.max}/${screenShortInput.step}/${screenShortInput.value}`);
     }
 
     // This control is independent of the visual effect presets. Set a
@@ -390,6 +399,8 @@ export async function runPreviewChecks() {
         const poseYaw = yawDegrees(draw.rotation);
         const perspective = Number.parseFloat(frameWindow.getComputedStyle(stage).perspective);
         const expectedCamera = compensatedCamera(poseYaw, 0, framedCompensation, perspective);
+        const expectedFramedPerspective = Number(distanceInput.value) / Number(screenShortInput.value)
+          * Math.min(canvas.clientWidth, canvas.clientHeight);
         const cameraError = maxDifference(draw.camera, expectedCamera);
         const origin = frameWindow.getComputedStyle(stage).perspectiveOrigin;
         const expectedOriginX = device.offsetLeft + device.offsetWidth / 2;
@@ -401,6 +412,9 @@ export async function runPreviewChecks() {
 
         if (!Number.isFinite(perspective) || perspective <= 0) {
           throw new Error(`${profile}/${requestedYaw}: missing stage perspective`);
+        }
+        if (Math.abs(perspective - expectedFramedPerspective) > 1.5) {
+          throw new Error(`${profile}/${requestedYaw}: perspective ${perspective.toFixed(2)}px != calibrated ${expectedFramedPerspective.toFixed(2)}px`);
         }
         if (Math.abs(Math.abs(poseYaw) - 55) > 2.5) {
           throw new Error(`${profile}/${requestedYaw}: pose stopped at ${poseYaw.toFixed(2)}°`);
@@ -414,7 +428,8 @@ export async function runPreviewChecks() {
         if (originError > 1.5) {
           throw new Error(`${profile}/${requestedYaw}: perspective origin error ${originError.toFixed(2)}px`);
         }
-        results.push({ profile, requestedYaw, poseYaw, rotationError, cameraError, perspective, originError });
+        results.push({ profile, requestedYaw, poseYaw, rotationError, cameraError, perspective,
+          expectedFramedPerspective, originError });
       }
     }
 
@@ -428,6 +443,73 @@ export async function runPreviewChecks() {
     enterButton.click();
     await waitFor(() => frameDocument.querySelector('.app')?.classList.contains('is-immersive') === true,
       'Preview App did not enter immersive mode');
+
+    // Use the phone-sized layout before connecting the sensor. In immersive
+    // mode there is no CSS phone frame, so the WebGL camera must use the same
+    // calibrated distance as the eventual sensor path.
+    iframe.style.width = '390px';
+    iframe.style.height = '844px';
+    await waitFor(() => canvas.clientWidth >= 380 && canvas.clientWidth <= 400
+      && canvas.clientHeight >= 830 && canvas.clientHeight <= 860,
+    'Preview App did not settle to the phone-sized canvas');
+    const expectedDistance = Number(distanceInput.value) / Number(screenShortInput.value)
+      * Math.min(canvas.clientWidth, canvas.clientHeight);
+
+    // Before enabling the sensor, every preset must use the same manual plane
+    // angle and camera rule. This catches the old immersive-only gain and
+    // max-angle branch, which made the desktop and phone paths disagree.
+    const immersiveManualResults: Record<string, unknown>[] = [];
+    const manualAngles = [30, -30, 60, -60, 75, -75, 80, -80];
+    for (const [profile, label] of profiles) {
+      const profileButton = Array.from(frameDocument.querySelectorAll<HTMLButtonElement>('.presets button'))
+        .find(button => button.textContent?.includes(label));
+      if (!profileButton) throw new Error(`Missing immersive ${profile} preset button`);
+      profileButton.click();
+      await wait(80);
+
+      for (const requestedYaw of manualAngles) {
+        const before = state.draws.length;
+        setRangeValue(frameWindow, yawInput, requestedYaw);
+        await waitFor(() => state.draws.length > before,
+          `Immersive ${profile}/${requestedYaw}: slider caused no scene draw`);
+        const expectedYaw = clamp(-requestedYaw, -80, 80);
+        const expectedPlane = rotationY(expectedYaw);
+        // Compare settled geometry. A fixed delay can sample the manual easing
+        // mid-flight, especially when traversing from +80 to -80 degrees.
+        await waitFor(() => maxDifference(state.draws[state.draws.length - 1].rotation, expectedPlane) < 0.0002,
+          `Immersive ${profile}/${requestedYaw}: plane did not settle to the requested angle`);
+        const draw = state.draws[state.draws.length - 1];
+        const expectedCamera = compensatedCamera(expectedYaw, 0,
+          Number(compensationInput.value) / 100, expectedDistance);
+        const planeError = maxDifference(draw.rotation, expectedPlane);
+        const cameraError = maxDifference(draw.camera, expectedCamera);
+        const actualYaw = yawDegrees(draw.rotation);
+        if (planeError > 0.003 || angularDifference(actualYaw, expectedYaw) > 1.5) {
+          throw new Error(`Immersive ${profile}/${requestedYaw}: plane ${actualYaw.toFixed(2)}° != ${expectedYaw.toFixed(2)}°`);
+        }
+        if (cameraError > 3) {
+          throw new Error(`Immersive ${profile}/${requestedYaw}: camera error ${cameraError.toFixed(2)}px`);
+        }
+        if (Math.abs(draw.camera[1]) > 0.01) {
+          throw new Error(`Immersive ${profile}/${requestedYaw}: camera responded to a non-yaw axis`);
+        }
+        immersiveManualResults.push({ profile, requestedYaw, expectedYaw, actualYaw,
+          planeError, cameraError, expectedDistance });
+      }
+    }
+
+    // Keep one manual pose to compare with the identical calibrated sensor
+    // pose below. Alpha +35° produces the same -35° horizontal plane yaw.
+    const manualParityBefore = state.draws.length;
+    setRangeValue(frameWindow, yawInput, 35);
+    await waitFor(() => state.draws.length > manualParityBefore,
+      'Immersive manual parity pose caused no scene draw');
+    await waitFor(() => maxDifference(state.draws[state.draws.length - 1].rotation, rotationY(-35)) < 0.0002,
+      'Immersive manual parity pose did not settle');
+    const manualParityDraw: SceneDraw = {
+      rotation: [...state.draws[state.draws.length - 1].rotation],
+      camera: [...state.draws[state.draws.length - 1].camera],
+    };
 
     const mockDeviceOrientationEvent = function MockDeviceOrientationEvent() {};
     Object.defineProperty(mockDeviceOrientationEvent, 'requestPermission', {
@@ -462,11 +544,6 @@ export async function runPreviewChecks() {
     sensorButton.click();
     await waitFor(() => frameDocument.querySelector('.sensor-message')?.textContent?.includes('正在等待方向数据') === true,
       'Preview App did not request orientation data');
-    iframe.style.width = '390px';
-    iframe.style.height = '844px';
-    await waitFor(() => canvas.clientWidth >= 380 && canvas.clientWidth <= 400
-      && canvas.clientHeight >= 830 && canvas.clientHeight <= 860,
-    'Preview App did not settle to the phone-sized canvas');
 
     const calibration: [number, number, number] = [0, 90, 0];
     const screenAngle = Number(frameRealm.screen.orientation?.angle ?? 0);
@@ -474,10 +551,12 @@ export async function runPreviewChecks() {
     await waitFor(() => frameDocument.querySelector('.sensor-message')?.textContent?.includes('体感已连接') === true,
       'Preview App did not accept the calibration orientation');
     const sensorResults: Record<string, unknown>[] = [];
-    const expectedDistance = 50 / 7 * 390;
     let lastExpectedSignature: number[] | null = null;
     let lastDraw: SceneDraw | null = null;
     const sensorReadings: Array<[string, [number, number, number]]> = [
+      // Same pose as the manual +35° fixture above: the calibrated sensor
+      // heading must produce the same -35° plane and observer camera.
+      ['parity', [35, 90, 0]],
       ['forward', [35, 70, 10]],
       ['mirror', [-35, 70, -10]],
       // Pure beta change must leave both the one-axis UI and the observer
@@ -557,10 +636,18 @@ export async function runPreviewChecks() {
       if (Math.abs(draw.camera[1]) > 0.01) {
         throw new Error(`Sensor ${name}: camera responded to phone pitch (${draw.camera[1].toFixed(3)}px)`);
       }
+      if (name === 'parity') {
+        const parityPlaneError = maxDifference(draw.rotation, manualParityDraw.rotation);
+        const parityCameraError = maxDifference(draw.camera, manualParityDraw.camera);
+        if (parityPlaneError > 0.003 || parityCameraError > 3) {
+          throw new Error(`Sensor/manual parity mismatch (plane ${parityPlaneError.toFixed(4)}, camera ${parityCameraError.toFixed(2)}px)`);
+        }
+      }
       sensorResults.push({ name, reading, expectedDirection, actualDirection, directionError,
         expectedPoseDirection, expectedYaw, expectedPitch: 0, actualYaw, uiSingleAxisError,
         compensationStrength, expectedCamera, actualCamera: draw.camera, actualCameraError,
-        expectedDistance, actualDistance, distanceError, expectedGeometryChange });
+        expectedDistance, actualDistance, distanceError, expectedGeometryChange,
+        manualParity: name === 'parity' });
       lastExpectedSignature = expectedSignature;
     }
 
@@ -667,10 +754,80 @@ export async function runPreviewChecks() {
       const planeError = maxDifference(draw.rotation, rotationY(yaw));
       const cameraError = maxDifference(draw.camera, expectedCamera);
       if (planeError > 0.003 || cameraError > 3) {
-        throw new Error(`High angle ${alpha}: bounded compensation error (plane ${planeError}, camera ${cameraError})`);
+        throw new Error(`High angle ${alpha}: linear compensation error (plane ${planeError}, camera ${cameraError})`);
       }
       highAngleResults.push({ alpha, camera: draw.camera, planeError, cameraError });
     }
+
+    // Distance and physical screen-size calibration affect only the observer
+    // radius. The one-axis plane must remain at the same yaw, and the same
+    // camera model must be shared by manual and sensor poses.
+    const calibrationResults: Record<string, unknown>[] = [];
+    const calibrationReading: [number, number, number] = [35, 90, 0];
+    const calibrationYaw = expectedHorizontalYaw(calibration, calibrationReading, screenAngle);
+    const calibrationPlane = rotationY(calibrationYaw);
+    const calibrationBefore = state.draws.length;
+    dispatchOrientation(calibrationReading);
+    await waitFor(() => state.draws.length > calibrationBefore,
+      'Calibration baseline orientation caused no scene draw');
+    await wait(120);
+    const calibrationBaseline = state.draws[state.draws.length - 1];
+    const calibrationBaselineError = maxDifference(calibrationBaseline.rotation, calibrationPlane);
+    if (calibrationBaselineError > 0.003) {
+      throw new Error(`Calibration baseline plane error ${calibrationBaselineError.toFixed(4)}`);
+    }
+
+    const captureCalibration = async (name: string, expectedRadius: number, before: number): Promise<void> => {
+      await waitFor(() => state.draws.length > before,
+        `Calibration ${name}: control caused no scene draw`);
+      await wait(120);
+      const draw = state.draws[state.draws.length - 1];
+      const planeError = maxDifference(draw.rotation, calibrationBaseline.rotation);
+      const expectedCamera = compensatedCamera(calibrationYaw, 0,
+        Number(compensationInput.value) / 100, expectedRadius);
+      const cameraError = maxDifference(draw.camera, expectedCamera);
+      const radiusError = Math.abs(Math.hypot(...draw.camera) - expectedRadius);
+      if (planeError > 0.003) {
+        throw new Error(`Calibration ${name}: changed plane (${planeError.toFixed(4)})`);
+      }
+      if (cameraError > 3 || radiusError > Math.max(4, expectedRadius * 0.01)) {
+        throw new Error(`Calibration ${name}: camera ${cameraError.toFixed(2)}px/radius ${radiusError.toFixed(2)}px`);
+      }
+      calibrationResults.push({ name, expectedRadius, planeError, cameraError, radiusError,
+        actualCamera: draw.camera });
+    };
+
+    const changedDistance = 68;
+    const distanceBefore = state.draws.length;
+    setRangeValue(frameWindow, distanceInput, changedDistance);
+    await waitFor(() => Math.abs(Number(distanceInput.value) - changedDistance) < 0.001,
+      'Viewing distance slider did not accept calibration value');
+    await captureCalibration('distance', changedDistance / Number(screenShortInput.value)
+      * Math.min(canvas.clientWidth, canvas.clientHeight), distanceBefore);
+
+    const restoreDistanceBefore = state.draws.length;
+    setRangeValue(frameWindow, distanceInput, 50);
+    await waitFor(() => distanceInput.value === '50',
+      'Viewing distance slider did not restore 50cm');
+    await waitFor(() => state.draws.length > restoreDistanceBefore,
+      'Viewing distance restore caused no scene draw');
+    await wait(120);
+
+    const changedScreenShort = 8.2;
+    const screenShortBefore = state.draws.length;
+    setRangeValue(frameWindow, screenShortInput, changedScreenShort);
+    await waitFor(() => Math.abs(Number(screenShortInput.value) - changedScreenShort) < 0.001,
+      'Screen short-edge slider did not accept calibration value');
+    await captureCalibration('screenShort', 50 / Number(screenShortInput.value)
+      * Math.min(canvas.clientWidth, canvas.clientHeight), screenShortBefore);
+
+    const restoreScreenShortBefore = state.draws.length;
+    setRangeValue(frameWindow, screenShortInput, 6.51);
+    await waitFor(() => Math.abs(Number(screenShortInput.value) - 6.51) < 0.001,
+      'Screen short-edge slider did not restore 6.51cm');
+    await waitFor(() => state.draws.length > restoreScreenShortBefore,
+      'Screen short-edge restore caused no scene draw');
+    await wait(120);
 
     // Returning to the calibrated pose must neutralise both the one-axis plane
     // and the observer camera, regardless of the current 100% compensation.
@@ -696,8 +853,9 @@ export async function runPreviewChecks() {
     await waitFor(() => compensationInput.value === '100',
       'Effect reset did not restore 100% compensation');
 
-    return { framed: results, sensor: sensorResults, pitchInvariant: pitchInvariantResults,
-      stretch: stretchResults,
+    return { framed: results, immersiveManual: immersiveManualResults,
+      sensor: sensorResults, pitchInvariant: pitchInvariantResults,
+      stretch: stretchResults, calibration: calibrationResults,
       highAngle: highAngleResults, resetCompensation: Number(compensationInput.value),
       neutralCamera: neutralDraw.camera, neutralPlaneError };
   } finally {

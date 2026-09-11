@@ -43,3 +43,11 @@ body.immersive-viewport-active #root{position:relative;z-index:0;width:100%;heig
 @media(min-width:760px){.is-immersive .controls.panel-open{top:calc(var(--immersive-viewport-top,0px) + env(safe-area-inset-top,0px) + 75px);right:calc(100% - var(--immersive-viewport-right,100%) + 20px);bottom:calc(100% - var(--immersive-viewport-bottom,100%) + env(safe-area-inset-bottom,0px) + 20px);max-width:calc(var(--immersive-viewport-width,100vw) - 32px)}}
 @media(max-width:759px){.is-immersive .controls.panel-open{top:auto;left:calc(var(--immersive-viewport-left,0px) + 12px);right:calc(100% - var(--immersive-viewport-right,100%) + 12px);bottom:calc(100% - var(--immersive-viewport-bottom,100%) + env(safe-area-inset-bottom,0px) + 12px);max-width:none;max-height:min(82%,calc(var(--immersive-viewport-height,100vh) - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 24px))}}
 @media(max-height:500px) and (orientation:landscape){.is-immersive .controls.panel-open{top:calc(var(--immersive-viewport-top,0px) + 12px);bottom:calc(100% - var(--immersive-viewport-bottom,100%) + 12px);right:calc(100% - var(--immersive-viewport-right,100%) + 12px);left:auto;width:min(350px,calc(var(--immersive-viewport-width,100vw) - 24px));max-height:calc(var(--immersive-viewport-height,100vh) - 24px)}}
+.geometry-note{font-size:11px;line-height:1.6;color:#727c67;margin:0 0 16px}
+.viewing-calibration{border:1px solid #d8ddce;border-radius:12px;background:#edf0e6;padding:13px 15px;margin:4px 0 22px}
+.viewing-calibration summary{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;list-style:none;font-size:12px;font-weight:600;color:#48513f;min-height:24px}
+.viewing-calibration summary::-webkit-details-marker{display:none}
+.viewing-calibration[open] summary svg{transform:rotate(180deg)}
+.viewing-calibration p{font-size:11px;line-height:1.8;color:#6f7864;margin:12px 0}
+.viewing-calibration .text-button{display:flex;align-items:center;gap:7px;font-size:12px;min-height:36px}
+.viewing-calibration .calibration-save-note{font-size:10px;margin-bottom:0}

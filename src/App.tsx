@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { ArrowDown, ArrowUpRight, Check, ChevronDown, Crosshair, Expand, Hand, Layers3, Maximize2, MoveUpRight, Pause, Play, RotateCcw, Settings2, Smartphone, Sparkles, X } from 'lucide-react';
-import { axisRotation, horizontalCorrectionDegrees, interpolateRotation, matrixToCss3d, scaleRotation, signedYawDegrees } from './orientation';
+import { axisRotation, horizontalCorrectionDegrees, interpolateRotation, matrixToCss3d, signedYawDegrees } from './orientation';
 import { createRenderer } from './renderer';
 import { effectAtAngle, MAX_BLUR, profiles, type EffectSettings } from './effect';
 import { useOrientation } from './useOrientation';
 import { useImmersiveViewport } from './useImmersiveViewport';
 import { compensatedViewerRotation, DEFAULT_COMPENSATION } from './compensation';
+import { CALIBRATION_STORAGE_KEY, DEFAULT_CALIBRATION, parseViewingCalibration, perspectiveDistancePx, referenceShortEdge } from './viewingCalibration';
 
 const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 const BASE_URL = import.meta.env.BASE_URL;
 const WALLPAPER_URL = `${BASE_URL}wallpaper.png`;
 const DEFAULT_PROFILE = 'deep';
-const DEFAULT_VIEWING_DISTANCE = 50;
+const MAX_YAW = 80;
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 const transpose = (m: number[]) => [m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]];
 const statusNames = { idle: '手动模拟', requesting: '等待授权', waiting: '等待体感', active: '体感已连接', denied: '未获授权', unavailable: '手动模拟', insecure: '需要 HTTPS', error: '连接未完成' };
@@ -26,6 +27,11 @@ function isMobilePreview() {
 
 function startsImmersive() {
   return new URLSearchParams(location.search).has('immersive') || isMobilePreview();
+}
+
+function initialCalibration() {
+  try { return parseViewingCalibration(window.localStorage.getItem(CALIBRATION_STORAGE_KEY)); }
+  catch { return { ...DEFAULT_CALIBRATION }; }
 }
 
 function Range({ label, value, min, max, step = 1, unit, onChange, hint, disabled = false }: {
@@ -45,7 +51,8 @@ export default function App() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [intro, setIntro] = useState(true);
   const [settings, setSettings] = useState<EffectSettings>({ ...profiles[DEFAULT_PROFILE] });
-  const [viewingDistance, setViewingDistance] = useState(DEFAULT_VIEWING_DISTANCE);
+  const [calibration, setCalibration] = useState(initialCalibration);
+  const [calibrationSaved, setCalibrationSaved] = useState(false);
   const [compensation, setCompensation] = useState(DEFAULT_COMPENSATION);
   const [profile, setProfile] = useState<string>(DEFAULT_PROFILE);
   const [yaw, setYaw] = useState(0);
@@ -65,9 +72,16 @@ export default function App() {
   const lastTap = useRef<{ x: number; y: number; time: number; pointerType: string } | null>(null);
   const hideAfterConnection = useRef(false);
   const lastHinge = useRef<'left' | 'right'>('left');
-  const frameState = useRef({ settings, viewingDistance, compensation, yaw, playing, enabled, immersive, sensorActive: false, reducedMotion });
-  frameState.current = { settings, viewingDistance, compensation, yaw, playing, enabled, immersive, sensorActive: sensor.status === 'active' || sensor.status === 'waiting', reducedMotion };
+  const frameState = useRef({ settings, calibration, compensation, yaw, playing, enabled, immersive, sensorActive: false, reducedMotion });
+  frameState.current = { settings, calibration, compensation, yaw, playing, enabled, immersive, sensorActive: sensor.status === 'active' || sensor.status === 'waiting', reducedMotion };
   useImmersiveViewport(immersive);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(CALIBRATION_STORAGE_KEY, JSON.stringify(calibration));
+      setCalibrationSaved(true);
+    } catch { setCalibrationSaved(false); }
+  }, [calibration]);
 
   useEffect(() => {
     const mobilePreview = window.matchMedia(MOBILE_PREVIEW_QUERY);
@@ -112,6 +126,8 @@ export default function App() {
     let lastUi = 0;
     let demoTime = 0;
     let previousDraw: number[] = [];
+    const coarsePointer = window.matchMedia('(pointer: coarse)');
+    const phoneBrowser = /iPhone|iPod|Android.*Mobile/i.test(navigator.userAgent);
     const render = (now: number) => {
       const dt = Math.min(0.25, (now - lastTime) / 1000);
       lastTime = now;
@@ -122,29 +138,31 @@ export default function App() {
       // Use only horizontal phone heading for both the plane and its observer.
       // Pitch must not shift the camera or contaminate yaw during a side turn.
       const horizontalYaw = s.sensorActive ? horizontalCorrectionDegrees(sensor.correction.current) : -demoYaw;
-      const targetYaw = clamp(horizontalYaw, -80, 80);
+      const targetYaw = clamp(horizontalYaw, -MAX_YAW, MAX_YAW);
       const target = axisRotation(0, targetYaw);
       // Follow the sensor directly so the hinged plane does not lag the hand.
       pose.current = s.sensorActive ? target : interpolateRotation(pose.current, target, s.reducedMotion ? 1 : 1 - Math.exp(-dt / 0.065));
       const angle = signedYawDegrees(pose.current);
       const effect = effectAtAngle(angle, s.settings);
       const amount = s.enabled ? effect : { progress: 0, blur: 0, dim: 0 };
-      // Sensor and framed preview use the input angle directly. The flat
-      // manual demo retains its optional gain and angle controls.
-      const directRotation = s.sensorActive || !s.immersive;
-      const rotation = s.enabled ? (directRotation ? pose.current : scaleRotation(pose.current, s.settings.gain, s.settings.maxAngle)) : IDENTITY;
+      // All previews use the same 1:1 counterrotation, regardless of preset.
+      const rotation = s.enabled ? pose.current : IDENTITY;
       const depth = 390 * Math.abs(Math.sin(signedYawDegrees(rotation) * Math.PI / 180));
       // Choose the hinge that sends every other point behind the glass. The pivot itself stays at z=0.
       if (Math.abs(angle) > 0.001) lastHinge.current = angle >= 0 ? 'left' : 'right';
       const hinge = lastHinge.current;
       const scale = (canvas.current?.clientWidth ?? 390) / 390;
-      // Convert viewing distance using an approximate 7 cm screen short edge;
-      // using the short edge keeps the same distance in landscape.
-      const shortEdge = Math.min(canvas.current?.clientWidth ?? 390, canvas.current?.clientHeight ?? 844);
-      const perspective = s.viewingDistance / 7 * shortEdge;
+      // Physical screen pixels keep calibration stable when browser bars or
+      // orientation change. Desktop frames use their own simulated size.
+      const shortEdge = referenceShortEdge(
+        canvas.current?.clientWidth ?? 390, canvas.current?.clientHeight ?? 844,
+        window.screen.width, window.screen.height,
+        s.immersive && (phoneBrowser || coarsePointer.matches),
+      );
+      const perspective = perspectiveDistancePx(shortEdge, s.calibration);
       const physicalRotation = pose.current;
-      // Adjustable compensation restores apparent width with a smooth limit
-      // at high angles. The same camera rule applies to each preview.
+      // At 100%, the observer follows the exact horizontal angle, including
+      // turns above 45 degrees; pitch stays excluded from the whole scene.
       const viewerRotation = compensatedViewerRotation(angle, 0, s.compensation);
       const signature = [...rotation, ...viewerRotation, amount.blur, amount.dim, scale, perspective, Number(s.immersive), Number(hinge === 'right')];
       if (signature.some((value, i) => Math.abs(value - (previousDraw[i] ?? Infinity)) > 0.00001)) {
@@ -215,7 +233,7 @@ export default function App() {
     if (!gesture.moved) return;
     if (!drag.current || event.pointerId !== drag.current.id) return;
     setPlaying(false); setIntro(false);
-    setYaw(clamp(drag.current.yaw + (event.clientX - drag.current.x) * 0.18, -55, 55));
+    setYaw(clamp(drag.current.yaw + (event.clientX - drag.current.x) * 0.18, -MAX_YAW, MAX_YAW));
   };
   const cancelGesture = () => { drag.current = null; tap.current = null; lastTap.current = null; };
   const finishGesture = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -242,8 +260,6 @@ export default function App() {
   const activateDemo = () => { sensor.disable(); setIntro(false); setPlaying(v => !v); };
   const isConnected = sensor.status === 'active';
   const isBusy = sensor.status === 'requesting' || sensor.status === 'waiting';
-  const usesSensor = isConnected || isBusy;
-  const usesDirectRotation = usesSensor || !immersive;
   const showImmersiveUi = immersive && controlsVisible;
 
   return <div className={`app ${immersive ? 'is-immersive' : ''}`}>
@@ -296,12 +312,19 @@ export default function App() {
           {([['gentle', '轻盈', 'SUBTLE'], ['balanced', '平衡', 'BALANCED'], ['deep', '深邃', 'IMMERSIVE']] as const).map(([key, label, english]) => <button key={key} className={profile === key ? 'selected' : ''} aria-pressed={profile === key} onClick={() => { setProfile(key); setSettings({ ...profiles[key] }); }}><span>{label}{profile === key && <Check size={12} />}</span><small>{english}</small></button>)}
         </div>
 
-        <div className="section-label tuning-label"><span>02</span><h3>微调空间</h3><button className="subtle-reset" onClick={() => { setSettings({ ...profiles[DEFAULT_PROFILE] }); setProfile(DEFAULT_PROFILE); setCompensation(DEFAULT_COMPENSATION); setViewingDistance(DEFAULT_VIEWING_DISTANCE); }} aria-label="重置效果参数"><RotateCcw size={13} />还原</button></div>
-        <Range label="拉伸补偿" value={compensation * 100} min={0} max={100} unit="%" onChange={v => setCompensation(v / 100)} hint="降低可减轻横向展开；大角度下补偿会平缓增长。" />
-        <Range label="翻转倍率" value={usesDirectRotation ? 1 : settings.gain} min={0} max={1.3} step={0.05} unit="×" onChange={v => update('gain', v)} disabled={usesDirectRotation} hint={usesDirectRotation ? '图片等角度反向转动，固定侧整条边贴屏。' : undefined} />
+        <div className="section-label tuning-label"><span>02</span><h3>微调空间</h3><button className="subtle-reset" onClick={() => { setSettings({ ...profiles[DEFAULT_PROFILE] }); setProfile(DEFAULT_PROFILE); setCompensation(DEFAULT_COMPENSATION); setCalibration({ ...DEFAULT_CALIBRATION }); }} aria-label="重置效果参数"><RotateCcw size={13} />还原</button></div>
+        <p className="geometry-note">手动与体感均为 1:1 反向旋转 · 左右各 80°</p>
+        <Range label="拉伸补偿" value={compensation * 100} min={0} max={100} unit="%" onChange={v => setCompensation(v / 100)} hint="100% 按实际左右角度补偿；降低可减轻横向展开。" />
         <Range label="开始失焦" value={settings.threshold} min={0} max={28} unit="°" onChange={v => update('threshold', v)} />
-        <Range label="最大翻转" value={usesDirectRotation ? 80 : settings.maxAngle} min={10} max={80} unit="°" onChange={v => update('maxAngle', v)} disabled={usesDirectRotation} />
-        <Range label="透视距离" value={viewingDistance} min={20} max={60} unit="cm" onChange={setViewingDistance} hint="调整近侧与远侧的大小差异。" />
+        <Range label="透视距离" value={calibration.distanceCm} min={20} max={100} unit="cm" onChange={v => setCalibration(c => ({ ...c, distanceCm: v }))} hint="设为眼睛到屏幕中心的实际距离，默认 50cm。" />
+        <details className="viewing-calibration">
+          <summary>屏幕与观看校准<ChevronDown size={14} /></summary>
+          <p>{Math.abs(calibration.screenShortCm - DEFAULT_CALIBRATION.screenShortCm) < 0.005 ? '当前按 iPhone 14 Pro 屏幕规格设置。' : '当前使用自定义屏幕尺寸。'}测量时只量发光区域，不含边框。</p>
+          <Range label="屏幕短边" value={calibration.screenShortCm} min={5} max={10} step={0.01} unit="cm" onChange={v => setCalibration(c => ({ ...c, screenShortCm: v }))} />
+          <p>量好眼睛到屏幕中心的距离，填入上方「透视距离」。保持屏幕中心正对双眼之间，再校准正面。</p>
+          <button className="text-button" onClick={isConnected ? reset : enableSensor}><Crosshair size={13} />{isConnected ? '以当前姿态校准正面' : '正对屏幕并启用体感'}</button>
+          <p className="calibration-save-note" role="status">{calibrationSaved ? '距离与尺寸已记住，刷新后保留。' : '距离与尺寸仅用于本次体验。'}</p>
+        </details>
         <Range label="失焦程度" value={settings.blur} min={0} max={MAX_BLUR} unit="px" onChange={v => update('blur', v)} hint="失焦越深，画面越暗；固定边缘保持清晰。" />
 
         <div className="effect-switch-row"><div><Sparkles size={15} /><span>空间效果</span></div><button role="switch" aria-checked={enabled} aria-label="空间效果开关" className={`switch ${enabled ? 'on' : ''}`} onClick={() => setEnabled(v => !v)}><span /></button></div>
@@ -312,7 +335,7 @@ export default function App() {
       <section className="simulation-panel" aria-label="手动模拟与实时读数">
         <div className="simulation-heading"><div><span className="eyebrow">HANDS-ON PREVIEW</span><h2>让视角动起来</h2></div><button className="demo-button" onClick={activateDemo}>{playing ? <Pause size={15} /> : <Play size={15} />} {playing ? '暂停演示' : '播放演示'}</button></div>
         <div className="simulation-grid"><div className="manual-controls">
-          <Range label="左右倾斜" value={yaw} min={-55} max={55} unit="°" onChange={v => { manual(); setYaw(v); }} />
+          <Range label="左右倾斜" value={yaw} min={-MAX_YAW} max={MAX_YAW} unit="°" onChange={v => { manual(); setYaw(v); }} />
         </div><div className="readouts"><div><span>左右倾角</span><strong>{Math.abs(metrics.angle).toFixed(1)}<small>°</small></strong></div><div><span>远侧深度</span><strong>{Math.round(metrics.depth)}<small>px</small></strong></div><div><span>最大失焦</span><strong>{metrics.blur.toFixed(1)}<small>px</small></strong></div></div></div>
         <div className="simulation-bottom"><span><span className="tiny-dot" />{reducedMotion ? '已减少缓动 · 演示需手动播放' : `${metrics.hinge === 'left' ? '左' : '右'}边缘为转轴 · 前后倾斜不影响画面`}</span><button onClick={reset}><Crosshair size={14} />回到正面</button></div>
       </section>

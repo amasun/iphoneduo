@@ -4,11 +4,11 @@ import { axisRotation } from './orientation.ts';
 export const DEFAULT_COMPENSATION = 1;
 
 function compensatedAngle(degrees: number, strength: number): number {
-  const scaled = Math.min(80, Math.abs(degrees)) * strength;
-  // Match both value and slope at 45 degrees, then approach 65 gradually.
-  // This keeps the eye away from grazing angles where expansion grows rapidly.
-  const limited = scaled <= 45 ? scaled : 45 + 20 * (1 - Math.exp(-(scaled - 45) / 20));
-  return Math.sign(degrees) * limited;
+  // Keep the observer on the same bounded, linear yaw/pitch scale as the
+  // physical preview.  At full strength this is exactly the measured angle;
+  // lower strengths interpolate from the fixed-eye pose without changing the
+  // image rotation itself.
+  return Math.sign(degrees) * Math.min(80, Math.abs(degrees)) * strength;
 }
 
 /**

@@ -73,7 +73,7 @@ test('compensation strength increases width continuously at the same image angle
   }
 });
 
-test('high-angle compensation has a smooth shoulder and stays away from grazing', () => {
+test('high-angle compensation remains linear through the bounded 80 degree range', () => {
   const cameraYaw = (a: number) => {
     const m = compensatedViewerRotation(a, 0, 1);
     return Math.atan2(m[2], m[8]) * 180 / Math.PI;
@@ -82,13 +82,122 @@ test('high-angle compensation has a smooth shoulder and stays away from grazing'
   close(cameraYaw(45), 45);
   close((cameraYaw(45) - cameraYaw(45 - step)) / step, 1, 0.00001);
   close((cameraYaw(45 + step) - cameraYaw(45)) / step, 1, 0.00001);
-  assert.ok(cameraYaw(80) > 60 && cameraYaw(80) < 65);
+  close(cameraYaw(80), 80);
+  close(cameraYaw(-80), -80);
   close(cameraYaw(800), cameraYaw(80));
   for (const yaw of [-80, 80]) {
     for (const pitch of [-80, 80]) {
       const m = compensatedViewerRotation(yaw, pitch, 1);
-      assert.ok(m[8] > 0.2, 'camera remains in front of the screen for combined turns');
+      assert.ok(m[8] > 0, 'camera remains in front of the screen for combined turns');
       close(Math.hypot(m[2], m[5], m[8]), 1);
+    }
+  }
+});
+
+test('compensation strength scales yaw and pitch linearly up to the 80 degree cap', () => {
+  const readAngles = (matrix: readonly number[]) => ({
+    yaw: Math.atan2(matrix[2], matrix[8]) * 180 / Math.PI,
+    pitch: Math.atan2(-matrix[5], Math.hypot(matrix[2], matrix[8])) * 180 / Math.PI,
+  });
+  for (const [yaw, pitch] of [[15, -20], [-45, 35], [80, -80], [120, -120]]) {
+    for (const strength of [0, 0.25, 0.5, 0.75, 1]) {
+      const actual = readAngles(compensatedViewerRotation(yaw, pitch, strength));
+      close(actual.yaw, Math.sign(yaw) * Math.min(80, Math.abs(yaw)) * strength);
+      close(actual.pitch, Math.sign(pitch) * Math.min(80, Math.abs(pitch)) * strength);
+    }
+  }
+});
+
+type Vec3 = [number, number, number];
+
+function add(a: Vec3, b: Vec3): Vec3 {
+  return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+}
+
+function subtract(a: Vec3, b: Vec3): Vec3 {
+  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+}
+
+function transform(matrix: readonly number[], point: Vec3): Vec3 {
+  return [
+    matrix[0] * point[0] + matrix[1] * point[1] + matrix[2] * point[2],
+    matrix[3] * point[0] + matrix[4] * point[1] + matrix[5] * point[2],
+    matrix[6] * point[0] + matrix[7] * point[1] + matrix[8] * point[2],
+  ];
+}
+
+function transpose(matrix: readonly number[]): number[] {
+  return [
+    matrix[0], matrix[3], matrix[6],
+    matrix[1], matrix[4], matrix[7],
+    matrix[2], matrix[5], matrix[8],
+  ];
+}
+
+/**
+ * Project a point on the rigid, rotated image onto the neutral phone screen.
+ * This is intentionally independent from src/projection.ts and the renderer.
+ */
+function projectToScreen(point: Vec3, eye: Vec3): Vec3 {
+  const rayToScreen = -eye[2] / (point[2] - eye[2]);
+  return add(eye, [
+    rayToScreen * (point[0] - eye[0]),
+    rayToScreen * (point[1] - eye[1]),
+    rayToScreen * (point[2] - eye[2]),
+  ]);
+}
+
+/** Apply the phone's forward R^-1 and then project to a static frontal eye. */
+function recoverAtStaticEye(screenPoint: Vec3, rotation: readonly number[], distance: number): Vec3 {
+  const stationaryWorldPoint = transform(transpose(rotation), screenPoint);
+  const frontalScale = distance / (distance - stationaryWorldPoint[2]);
+  return [
+    stationaryWorldPoint[0] * frontalScale,
+    stationaryWorldPoint[1] * frontalScale,
+    0,
+  ];
+}
+
+test('rigid image round trip preserves a square through both hinges and viewing distances', () => {
+  const width = 390;
+  const squareHalf = 20;
+  const angles = [-80, -75, -60, -45, -30, -15, 15, 30, 45, 60, 75, 80];
+  // Keep both a normal desktop distance and a closer eye in the independent
+  // model. The square is centered so every requested angle stays in front of
+  // both eyes, including the 80 degree boundary.
+  for (const distance of [780, 1950]) {
+    for (const angle of angles) {
+      // The physical phone and rigid plane use the measured angle, independent
+      // of the production observer. A compressed observer must fail this test.
+      const a = radians(angle);
+      const rotation = [Math.cos(a), 0, Math.sin(a), 0, 1, 0, -Math.sin(a), 0, Math.cos(a)];
+      const eye = transform(compensatedViewerRotation(angle, 0, 1), [0, 0, distance]);
+      const pivot: Vec3 = [angle >= 0 ? -width / 2 : width / 2, 0, 0];
+      const corners: Vec3[] = [];
+      for (const x of [-squareHalf, squareHalf]) {
+        for (const y of [-squareHalf, squareHalf]) {
+          const source: Vec3 = [x, y, 0];
+          const rigidPoint = add(pivot, transform(rotation, subtract(source, pivot)));
+          const screenPoint = projectToScreen(rigidPoint, eye);
+          const recovered = recoverAtStaticEye(screenPoint, rotation, distance);
+          assert.ok(recovered.every(Number.isFinite),
+            `${angle} degrees/${distance}px produced a non-finite corner`);
+          corners.push(recovered);
+        }
+      }
+
+      const minX = Math.min(...corners.map(point => point[0]));
+      const maxX = Math.max(...corners.map(point => point[0]));
+      const minY = Math.min(...corners.map(point => point[1]));
+      const maxY = Math.max(...corners.map(point => point[1]));
+      close(maxX - minX, maxY - minY, 1e-7);
+      close(maxX - minX, squareHalf * 2 * distance / (distance + width / 2 * Math.abs(Math.sin(a))), 1e-7);
+      close(corners[0][0], corners[1][0], 1e-7);
+      close(corners[2][0], corners[3][0], 1e-7);
+      close(corners[0][1], corners[2][1], 1e-7);
+      close(corners[1][1], corners[3][1], 1e-7);
+      assert.ok(maxX > minX && maxY > minY,
+        `${angle} degrees/${distance}px collapsed the recovered square`);
     }
   }
 });
