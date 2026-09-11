@@ -290,7 +290,6 @@ export default function App() {
       {showImmersiveUi && <div className="immersive-toolbar">
         <button className="glass-button" onClick={() => { setImmersive(false); setIntro(false); }} aria-label="退出沉浸体验"><Maximize2 size={18} /></button>
         <span className="immersive-brand">INSIDE.</span>
-        <button className="glass-button" onClick={() => setPanelOpen(v => !v)} aria-expanded={panelOpen} aria-controls="controls" aria-label="打开效果调节"><Settings2 size={19} /></button>
       </div>}
       {showImmersiveUi && panelOpen && <button className="panel-backdrop" aria-label="关闭效果调节" onClick={() => setPanelOpen(false)} />}
 
@@ -336,9 +335,13 @@ export default function App() {
 
     <footer className="page-footer"><span>INSIDE / MOTION STUDY</span><span>一块屏幕，也可以有纵深。<ArrowDown size={13} /></span><span>DESIGNED TO BE FELT.</span></footer>
 
-    {showImmersiveUi && !panelOpen && <div className={`immersive-bottom ${intro ? 'with-intro' : ''}`}>
-      {intro ? <div className="intro-card"><span className="eyebrow">A LITTLE SHIFT IN PERSPECTIVE</span><h2>让画面，退入屏幕。</h2><p>正对手机，只需缓慢向左或向右倾斜。</p><button className="primary-button" onClick={enableSensor}><Smartphone size={18} />启用手机体感<ArrowUpRight size={17} /></button><button className="intro-manual" onClick={manual}>先用手指拖动体验</button></div> : <div className="immersive-actions"><button className="glass-button status-button" onClick={isConnected ? reset : enableSensor}>{isConnected ? <Crosshair size={15} /> : <Smartphone size={15} />}{isConnected ? '校准正面' : '启用体感'}</button><span className="angle-pill">{Math.abs(metrics.angle).toFixed(0)}° <span>{metrics.hinge === 'left' ? '左侧' : '右侧'}固定</span></span><button className="glass-button" aria-label={playing ? '暂停演示' : '播放演示'} onClick={activateDemo}>{playing ? <Pause size={17} /> : <Play size={17} />}</button></div>}
-      {!intro && !isConnected && sensor.status !== 'idle' && <p className="immersive-message" role="status">{sensor.message}</p>}
+    {showImmersiveUi && <div className={`immersive-bottom ${intro && !panelOpen ? 'with-intro' : ''}`}>
+      {!panelOpen && intro && <div className="intro-card"><span className="eyebrow">A LITTLE SHIFT IN PERSPECTIVE</span><h2>让画面，退入屏幕。</h2><p>正对手机，只需缓慢向左或向右倾斜。</p><button className="primary-button" onClick={enableSensor}><Smartphone size={18} />启用手机体感<ArrowUpRight size={17} /></button><button className="intro-manual" onClick={manual}>先用手指拖动体验</button></div>}
+      {!panelOpen && !intro && !isConnected && sensor.status !== 'idle' && <p className="immersive-message" role="status">{sensor.message}</p>}
+      <div className={`immersive-actions ${intro || panelOpen ? 'settings-only' : ''}`}>
+        {!panelOpen && !intro && <><button className="glass-button status-button" onClick={isConnected ? reset : enableSensor}>{isConnected ? <Crosshair size={15} /> : <Smartphone size={15} />}{isConnected ? '校准正面' : '启用体感'}</button><span className="angle-pill">{Math.abs(metrics.angle).toFixed(0)}° <span>{metrics.hinge === 'left' ? '左侧' : '右侧'}固定</span></span><button className="glass-button" aria-label={playing ? '暂停演示' : '播放演示'} onClick={activateDemo}>{playing ? <Pause size={17} /> : <Play size={17} />}</button></>}
+        <button className="glass-button immersive-settings" onClick={() => setPanelOpen(v => !v)} aria-expanded={panelOpen} aria-controls="controls" aria-label="打开效果调节"><Settings2 size={19} /></button>
+      </div>
     </div>}
     {rendererError && (!immersive || controlsVisible) && <div className="render-notice" role="status">{rendererError} 当前使用基础模糊预览。</div>}
   </div>;

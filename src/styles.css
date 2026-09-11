@@ -52,16 +52,27 @@ body.immersive-viewport-active #root{position:relative;z-index:0;width:100%;heig
 .viewing-calibration .text-button{display:flex;align-items:center;gap:7px;font-size:12px;min-height:36px}
 .viewing-calibration .calibration-save-note{font-size:10px;margin-bottom:0}
 
-/* Keep immersive tuning beside its trigger, with the scene visible around it. */
+/* Open compact tuning above the bottom action row. */
 .is-immersive .controls.panel-open{
-  top:calc(var(--immersive-viewport-top,0px) + env(safe-area-inset-top,0px) + 75px);
+  top:auto;
   right:calc(100% - var(--immersive-viewport-right,100%) + max(12px,env(safe-area-inset-right,0px)));
-  bottom:auto;left:auto;width:304px;height:auto;
+  bottom:calc(100% - var(--immersive-viewport-bottom,100%) + env(safe-area-inset-bottom,0px) + 78px);left:auto;width:304px;height:auto;
   max-width:calc(var(--immersive-viewport-width,100vw) - 24px);
   max-height:calc(var(--immersive-viewport-height,100vh) - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 90px);
   padding:8px 12px 12px;border-radius:16px;
   box-shadow:0 8px 28px #0003;
+  animation:tuning-enter .18s ease-out;
 }
+.is-immersive .immersive-toolbar::after{content:'';width:44px;flex-shrink:0}
+.is-immersive .immersive-bottom{z-index:21}
+.is-immersive .immersive-actions{justify-content:flex-end;gap:6px}
+.is-immersive .immersive-actions.settings-only{justify-content:flex-end}
+.is-immersive .immersive-settings{flex-shrink:0}
+.is-immersive .intro-card{margin-bottom:12px}
+.is-immersive .immersive-message{margin:0 auto 10px}
+@media(max-width:380px){.is-immersive .status-button{padding:0 10px;font-size:10px}.is-immersive .angle-pill{padding:0 10px;font-size:12px}}
+@keyframes tuning-enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.is-immersive .controls.panel-open{animation:none}}
 .is-immersive .panel-backdrop{background:transparent}
 .is-immersive .controls>.controls-heading,
 .is-immersive .controls>.lead,
