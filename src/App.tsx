@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
-import { ArrowDown, ArrowUpRight, ChevronDown, Crosshair, Expand, Hand, Layers3, Maximize2, MoveUpRight, Pause, Play, RotateCcw, Settings2, Smartphone, Sparkles, X } from 'lucide-react';
+import { ArrowUpRight, ChevronDown, Crosshair, Expand, Maximize2, MoveUpRight, Pause, Play, RotateCcw, Settings2, Smartphone, X } from 'lucide-react';
 import { axisRotation, horizontalCorrectionDegrees, interpolateRotation, matrixToCss3d, signedYawDegrees } from './orientation';
 import { createRenderer } from './renderer';
 import type { PhoneModelRenderer } from './phoneModelRenderer';
@@ -350,17 +350,12 @@ export default function App() {
 
   return <div className={`app ${immersive ? 'is-immersive' : ''}`}>
     <header className="topbar">
-      <a className="wordmark" href={BASE_URL} aria-label="INSIDE 首页"><Layers3 size={22} strokeWidth={1.6} /><span>INSIDE<span className="wordmark-dot">.</span></span></a>
-      <span className="topbar-caption">A STUDY IN PERCEPTION</span>
-      <span className="edition"><span className="tiny-dot" /> EXPERIMENT 001</span>
+      <a className="wordmark" href={BASE_URL} aria-label="INSIDE 首页"><span>INSIDE.</span></a>
     </header>
 
     <main className="workspace">
       <section className="preview-panel" aria-label="空间效果预览">
-        <div className="preview-heading"><span className="eyebrow">BEYOND THE SURFACE</span><h1>屏幕之内，<br /><span>视线之外。</span></h1><p>转动手机，让画面退入屏幕。</p></div>
         <div className={`stage ${!immersive && modelAspect ? 'model-ready' : ''}`} style={modelAspect ? { '--model-screen-aspect': modelAspect } as CSSProperties : undefined} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={finishGesture} onPointerCancel={cancelGesture} onLostPointerCapture={() => { if (tap.current) cancelGesture(); }}>
-          <div className="stage-orbit orbit-one" aria-hidden="true" /><div className="stage-orbit orbit-two" aria-hidden="true" />
-          <div className="stage-label" aria-hidden="true"><span className="cross-mark">+</span><span>LIVE<br />PERSPECTIVE</span></div>
           <div className="device-shadow" aria-hidden="true" />
           <div className="device" ref={device}>
             <div className="device-button button-one" aria-hidden="true" /><div className="device-button button-two" aria-hidden="true" /><div className="device-button button-three" aria-hidden="true" />
@@ -371,7 +366,6 @@ export default function App() {
             </div>
           </div>
           {!immersive && <canvas ref={modelCanvas} className="phone-model-canvas" role="img" aria-label="可旋转的 iPhone 17 Pro Max 三维模型，屏幕实时呈现倾斜效果" aria-hidden={!modelAspect} />}
-          <div className="stage-caption"><Hand size={15} /><span>上下左右拖动，360° 浏览手机</span><span className="caption-separator" /> <span>或使用下方角度滑杆</span></div>
         </div>
         <div className="preview-footer"><span><span className={`tiny-dot ${isConnected ? 'live' : ''}`} />{statusNames[sensor.status]}</span><button onClick={() => { setImmersive(true); setPanelOpen(false); setControlsVisible(!isMobilePreview()); }}><Expand size={15} />沉浸体验<ArrowUpRight size={14} /></button></div>
         {!immersive && <div className="model-credit"><a href="https://sketchfab.com/3d-models/iphone-17-pro-max-87fc1df741384124a8ce0226d2b2058d" target="_blank" rel="noreferrer">iPhone 17 Pro Max</a><span>·</span><a href="https://sketchfab.com/MG990" target="_blank" rel="noreferrer">MajdyModels</a><span>·</span><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a><span>· 实时屏幕改编</span></div>}
@@ -380,47 +374,40 @@ export default function App() {
 
       {showImmersiveUi && <div className="immersive-toolbar">
         <button className="glass-button" onClick={() => { setImmersive(false); setIntro(false); }} aria-label="退出沉浸体验"><Maximize2 size={18} /></button>
-        <span className="immersive-brand">INSIDE.</span>
       </div>}
       {showImmersiveUi && panelOpen && <button className="panel-backdrop" aria-label="关闭效果调节" onClick={() => setPanelOpen(false)} />}
 
       <aside id="controls" className={`controls ${panelOpen && (!immersive || controlsVisible) ? 'panel-open' : ''}`} aria-label="效果调节">
-        <div className="controls-heading"><div><span className="eyebrow">THE EXPERIMENT</span><h2>感受空间的另一面<span>↗</span></h2></div><button className="panel-close icon-button" onClick={() => setPanelOpen(false)} aria-label="关闭调节面板"><X size={20} /></button></div>
-        <p className="lead">拖动查看完整机身，自由探索每个角度。<br />左右转动，让画面退入屏幕深处。</p>
 
         <div className="connection-card">
-          <div className="connection-title"><span className="connection-icon"><Smartphone size={20} /></span><div><strong>用你的 iPhone 体验</strong><span>正对屏幕 · 允许体感 · 缓慢倾斜</span></div><span className={`connection-dot ${isConnected ? 'connected' : ''}`} /></div>
-          <button className="primary-button" onClick={isConnected ? reset : enableSensor} disabled={sensor.status === 'requesting'}>{isConnected ? <Crosshair size={17} /> : <MoveUpRight size={17} />}{isConnected ? '重新校准正面' : isBusy ? '重新连接体感' : '启用手机体感'}<span>{isConnected ? '已连接' : '开始体验'}</span></button>
-          <p className={`sensor-message ${['denied', 'insecure', 'error'].includes(sensor.status) ? 'attention' : ''}`} role="status">{sensor.message}</p>
+          <button className="primary-button" onClick={isConnected ? reset : enableSensor} disabled={sensor.status === 'requesting'}>{isConnected ? <Crosshair size={17} /> : <MoveUpRight size={17} />}{isConnected ? '重新校准正面' : isBusy ? '重新连接体感' : '启用手机体感'}</button>
+          {sensor.status !== 'idle' && <p className={`sensor-message ${['denied', 'insecure', 'error'].includes(sensor.status) ? 'attention' : ''}`} role="status">{sensor.message}</p>}
           {(isConnected || isBusy) && <button className="text-button" onClick={manual}>切换到手动模拟</button>}
         </div>
 
         <div className="section-label tuning-label"><h3>微调空间</h3><button className="subtle-reset" onClick={() => { setSettings({ ...DEFAULT_EFFECT_SETTINGS }); setCompensation(DEFAULT_COMPENSATION); setPerspectiveStrength(DEFAULT_PERSPECTIVE_STRENGTH); setCalibration({ ...DEFAULT_CALIBRATION }); }} aria-label="重置效果参数"><RotateCcw size={13} />还原</button><button className="panel-close tuning-close" onClick={() => setPanelOpen(false)} aria-label="关闭参数面板"><X size={18} /></button></div>
-        <p className="geometry-note">模型可自由旋转 · 以下参数调节屏幕内的空间效果</p>
-        <Range label="拉伸补偿" value={compensation * 100} min={0} max={100} unit="%" onChange={v => setCompensation(v / 100)} hint="100% 按实际左右角度补偿；降低可减轻横向展开。" />
-        <Range label="远侧收缩" value={perspectiveStrength * 100} min={0} max={200} unit="%" onChange={v => setPerspectiveStrength(v / 100)} hint="调低可减轻远侧变小；0% 无近远收缩，100% 为原透视。默认 50%。" />
+        <Range label="拉伸补偿" value={compensation * 100} min={0} max={100} unit="%" onChange={v => setCompensation(v / 100)} />
+        <Range label="远侧收缩" value={perspectiveStrength * 100} min={0} max={200} unit="%" onChange={v => setPerspectiveStrength(v / 100)} />
         <Range label="开始失焦" value={settings.threshold} min={0} max={28} unit="°" onChange={v => update('threshold', v)} />
-        <Range label="透视距离" value={calibration.distanceCm} min={20} max={100} unit="cm" onChange={v => setCalibration(c => ({ ...c, distanceCm: v }))} hint={`设为眼睛到屏幕中心的实际距离，默认 ${DEFAULT_CALIBRATION.distanceCm}cm。`} />
-        <Range label="失焦程度" value={settings.blur} min={0} max={MAX_BLUR} unit="px" onChange={v => update('blur', v)} hint="失焦越深，画面越暗；固定边缘保持清晰。" />
+        <Range label="透视距离" value={calibration.distanceCm} min={20} max={100} unit="cm" onChange={v => setCalibration(c => ({ ...c, distanceCm: v }))} />
+        <Range label="失焦程度" value={settings.blur} min={0} max={MAX_BLUR} unit="px" onChange={v => update('blur', v)} />
 
-        <div className="effect-switch-row"><div><Sparkles size={15} /><span>空间效果</span></div><button role="switch" aria-checked={enabled} aria-label="空间效果开关" className={`switch ${enabled ? 'on' : ''}`} onClick={() => setEnabled(v => !v)}><span /></button></div>
-        <div className="hinge-status"><span><span className="tiny-dot" />{metrics.hinge === 'left' ? '左侧' : '右侧'}边缘固定 · 单轴翻转</span><button onClick={reset}><Crosshair size={13} />回正</button></div>
-        <details className="instructions"><summary>如何在 iPhone 上打开<ChevronDown size={14} /></summary><p>通过受信任的 HTTPS 地址，用 Safari 打开本页。轻点「启用手机体感」并允许访问，保持手机正对自己，然后转动手腕。</p><p>可通过 Safari 分享菜单「添加到主屏幕」获得更完整的显示区域。若用电脑的局域网地址，HTTPS 证书需要先在 iPhone 上信任。普通 HTTP 地址支持手动模拟。</p><p>这是基于初始姿态的视觉近似；头部保持基本不动时效果最佳。图中时间与按钮属于演示图片。</p></details>
+        <div className="effect-switch-row"><div><span>空间效果</span></div><button role="switch" aria-checked={enabled} aria-label="空间效果开关" className={`switch ${enabled ? 'on' : ''}`} onClick={() => setEnabled(v => !v)}><span /></button></div>
+        <details className="instructions"><summary>使用说明<ChevronDown size={14} /></summary><p>拖动模型可上下左右自由旋转，点击「回到正面」复位。</p><p>在 iPhone Safari 中启用体感并允许访问。正对屏幕校准后，保持头部不动，缓慢左右转动手机。双击画面显示或隐藏控件。</p><p>拉伸补偿调节横向展开，远侧收缩调节近大远小。透视距离填写眼睛到屏幕的距离；失焦程度越高，模糊区域越暗。</p><p>通过 Safari 分享菜单「添加到主屏幕」可全屏体验。</p></details>
       </aside>
 
       <section className="simulation-panel" aria-label="手动模拟与实时读数">
-        <div className="simulation-heading"><div><span className="eyebrow">HANDS-ON PREVIEW</span><h2>让视角动起来</h2></div><button className="demo-button" onClick={activateDemo}>{playing ? <Pause size={15} /> : <Play size={15} />} {playing ? '暂停演示' : '播放演示'}</button></div>
+        <div className="simulation-heading"><h2>旋转</h2><button className="demo-button" onClick={activateDemo}>{playing ? <Pause size={15} /> : <Play size={15} />} {playing ? '暂停演示' : '播放演示'}</button></div>
         <div className="simulation-grid"><div className="manual-controls">
           <Range label="左右倾斜" value={immersive ? yaw : wrapDegrees(yaw)} min={immersive ? -MAX_YAW : -180} max={immersive ? MAX_YAW : 180} unit="°" onChange={v => { manual(); setYaw(v); }} />
-        </div><div className="readouts"><div><span>左右倾角</span><strong>{Math.abs(immersive ? metrics.angle : wrapDegrees(yaw)).toFixed(1)}<small>°</small></strong></div><div><span>远侧深度</span><strong>{Math.round(metrics.depth)}<small>px</small></strong></div><div><span>最大失焦</span><strong>{metrics.blur.toFixed(1)}<small>px</small></strong></div></div></div>
-        <div className="simulation-bottom"><span><span className="tiny-dot" />{reducedMotion ? '已减少缓动 · 演示需手动播放' : '自由旋转 · 可查看背面、顶部与底部'}</span><button onClick={reset}><Crosshair size={14} />回到正面</button></div>
+        </div></div>
+        <div className="simulation-bottom"><span>拖动查看机身</span><button onClick={reset}><Crosshair size={14} />回到正面</button></div>
       </section>
     </main>
 
-    <footer className="page-footer"><span>INSIDE / MOTION STUDY</span><span>一块屏幕，也可以有纵深。<ArrowDown size={13} /></span><span>DESIGNED TO BE FELT.</span></footer>
 
     {showImmersiveUi && <div className={`immersive-bottom ${intro && !panelOpen ? 'with-intro' : ''}`}>
-      {!panelOpen && intro && <div className="intro-card"><span className="eyebrow">A LITTLE SHIFT IN PERSPECTIVE</span><h2>让画面，退入屏幕。</h2><p>正对手机，只需缓慢向左或向右倾斜。</p><button className="primary-button" onClick={enableSensor}><Smartphone size={18} />启用手机体感<ArrowUpRight size={17} /></button><button className="intro-manual" onClick={manual}>先用手指拖动体验</button></div>}
+      {!panelOpen && intro && <div className="intro-card"><p>正对屏幕后启用体感</p><button className="primary-button" onClick={enableSensor}><Smartphone size={18} />启用手机体感<ArrowUpRight size={17} /></button><button className="intro-manual" onClick={manual}>手动体验</button></div>}
       {!panelOpen && !intro && !isConnected && sensor.status !== 'idle' && <p className="immersive-message" role="status">{sensor.message}</p>}
       <div className={`immersive-actions ${intro || panelOpen ? 'settings-only' : ''}`}>
         {!panelOpen && !intro && <><button className="glass-button status-button" onClick={isConnected ? reset : enableSensor}>{isConnected ? <Crosshair size={15} /> : <Smartphone size={15} />}{isConnected ? '校准正面' : '启用体感'}</button><span className="angle-pill">{Math.abs(metrics.angle).toFixed(0)}° <span>{metrics.hinge === 'left' ? '左侧' : '右侧'}固定</span></span><button className="glass-button" aria-label={playing ? '暂停演示' : '播放演示'} onClick={activateDemo}>{playing ? <Pause size={17} /> : <Play size={17} />}</button></>}
