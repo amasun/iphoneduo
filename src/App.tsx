@@ -6,7 +6,7 @@ import { DEFAULT_EFFECT_SETTINGS, effectAtAngle, MAX_BLUR, type EffectSettings }
 import { useOrientation } from './useOrientation';
 import { useImmersiveViewport } from './useImmersiveViewport';
 import { compensatedViewerRotation, DEFAULT_COMPENSATION } from './compensation';
-import { CALIBRATION_STORAGE_KEY, DEFAULT_CALIBRATION, parseViewingCalibration, perspectiveDistancePx, referenceShortEdge } from './viewingCalibration';
+import { CALIBRATION_STORAGE_KEY, DEFAULT_CALIBRATION, parseViewingCalibration, perspectiveDistancePx, referenceShortEdge, serializeViewingCalibration } from './viewingCalibration';
 
 const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 const BASE_URL = import.meta.env.BASE_URL;
@@ -76,7 +76,7 @@ export default function App() {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(CALIBRATION_STORAGE_KEY, JSON.stringify(calibration));
+      window.localStorage.setItem(CALIBRATION_STORAGE_KEY, serializeViewingCalibration(calibration));
       setCalibrationSaved(true);
     } catch { setCalibrationSaved(false); }
   }, [calibration]);
@@ -309,7 +309,7 @@ export default function App() {
         <p className="geometry-note">手动与体感均为 1:1 反向旋转 · 左右各 80°</p>
         <Range label="拉伸补偿" value={compensation * 100} min={0} max={100} unit="%" onChange={v => setCompensation(v / 100)} hint="100% 按实际左右角度补偿；降低可减轻横向展开。" />
         <Range label="开始失焦" value={settings.threshold} min={0} max={28} unit="°" onChange={v => update('threshold', v)} />
-        <Range label="透视距离" value={calibration.distanceCm} min={20} max={100} unit="cm" onChange={v => setCalibration(c => ({ ...c, distanceCm: v }))} hint="设为眼睛到屏幕中心的实际距离，默认 50cm。" />
+        <Range label="透视距离" value={calibration.distanceCm} min={20} max={100} unit="cm" onChange={v => setCalibration(c => ({ ...c, distanceCm: v }))} hint={`设为眼睛到屏幕中心的实际距离，默认 ${DEFAULT_CALIBRATION.distanceCm}cm。`} />
         <details className="viewing-calibration">
           <summary>屏幕与观看校准<ChevronDown size={14} /></summary>
           <p>{Math.abs(calibration.screenShortCm - DEFAULT_CALIBRATION.screenShortCm) < 0.005 ? '当前按 iPhone 14 Pro 屏幕规格设置。' : '当前使用自定义屏幕尺寸。'}测量时只量发光区域，不含边框。</p>

@@ -341,11 +341,11 @@ export async function runPreviewChecks() {
       throw new Error(`Manual yaw range is not -80..80: ${yawInput.min}..${yawInput.max}`);
     }
     if (compensationInput.min !== '0' || compensationInput.max !== '100'
-      || compensationInput.value !== '100') {
-      throw new Error(`Stretch compensation range is not the default 0..100/100: ${compensationInput.min}..${compensationInput.max}/${compensationInput.value}`);
+      || compensationInput.value !== '80') {
+      throw new Error(`Stretch compensation range is not the default 0..100/80: ${compensationInput.min}..${compensationInput.max}/${compensationInput.value}`);
     }
-    if (distanceInput.min !== '20' || distanceInput.max !== '100' || distanceInput.value !== '50') {
-      throw new Error(`Viewing distance range is not the default 20..100/50: ${distanceInput.min}..${distanceInput.max}/${distanceInput.value}`);
+    if (distanceInput.min !== '20' || distanceInput.max !== '100' || distanceInput.value !== '40') {
+      throw new Error(`Viewing distance range is not the default 20..100/40: ${distanceInput.min}..${distanceInput.max}/${distanceInput.value}`);
     }
     if (screenShortInput.min !== '5' || screenShortInput.max !== '10'
       || screenShortInput.step !== '0.01' || screenShortInput.value !== '6.51') {
@@ -768,9 +768,9 @@ export async function runPreviewChecks() {
       * Math.min(canvas.clientWidth, canvas.clientHeight), distanceBefore);
 
     const restoreDistanceBefore = state.draws.length;
-    setRangeValue(frameWindow, distanceInput, 50);
-    await waitFor(() => distanceInput.value === '50',
-      'Viewing distance slider did not restore 50cm');
+    setRangeValue(frameWindow, distanceInput, 40);
+    await waitFor(() => distanceInput.value === '40',
+      'Viewing distance slider did not restore 40cm');
     await waitFor(() => state.draws.length > restoreDistanceBefore,
       'Viewing distance restore caused no scene draw');
     await wait(120);
@@ -780,7 +780,7 @@ export async function runPreviewChecks() {
     setRangeValue(frameWindow, screenShortInput, changedScreenShort);
     await waitFor(() => Math.abs(Number(screenShortInput.value) - changedScreenShort) < 0.001,
       'Screen short-edge slider did not accept calibration value');
-    await captureCalibration('screenShort', 50 / Number(screenShortInput.value)
+    await captureCalibration('screenShort', 40 / Number(screenShortInput.value)
       * Math.min(canvas.clientWidth, canvas.clientHeight), screenShortBefore);
 
     const restoreScreenShortBefore = state.draws.length;
@@ -812,8 +812,8 @@ export async function runPreviewChecks() {
     await waitFor(() => compensationInput.value === '50',
       'Stretch compensation slider did not accept 50% before reset');
     resetButton.click();
-    await waitFor(() => compensationInput.value === '100',
-      'Effect reset did not restore 100% compensation');
+    await waitFor(() => compensationInput.value === '80' && distanceInput.value === '40',
+      'Effect reset did not restore 80% compensation and 40cm viewing distance');
 
     return { framed: results, immersiveManual: immersiveManualResults,
       sensor: sensorResults, pitchInvariant: pitchInvariantResults,

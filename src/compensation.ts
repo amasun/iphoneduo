@@ -1,7 +1,7 @@
 import { axisRotation } from './orientation.ts';
 
 /** A visual tuning default, independent of the image's rotation gain. */
-export const DEFAULT_COMPENSATION = 1;
+export const DEFAULT_COMPENSATION = 0.8;
 
 function compensatedAngle(degrees: number, strength: number): number {
   // Keep the observer on the same bounded, linear yaw/pitch scale as the

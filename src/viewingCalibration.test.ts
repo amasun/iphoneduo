@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_CALIBRATION, parseViewingCalibration, perspectiveDistancePx, referenceShortEdge } from './viewingCalibration.ts';
+import { DEFAULT_CALIBRATION, parseViewingCalibration, perspectiveDistancePx, referenceShortEdge, serializeViewingCalibration } from './viewingCalibration.ts';
 
 test('physical centimetres map to the same perspective at different rendering scales', () => {
   // A 6.5 cm screen viewed from 52 cm is eight screen widths away.
@@ -23,4 +23,9 @@ test('saved calibration loads independently and malformed values fall back to de
     assert.deepEqual(parseViewingCalibration(raw), DEFAULT_CALIBRATION);
   }
   assert.deepEqual(parseViewingCalibration('{"distanceCm":45,"screenShortCm":999}'), { distanceCm: 45, screenShortCm: 6.51 });
+  assert.deepEqual(parseViewingCalibration('{"distanceCm":50,"screenShortCm":6.8}'), { distanceCm: 40, screenShortCm: 6.8 });
+  for (const distanceCm of [40, 50, 68]) {
+    const calibration = { distanceCm, screenShortCm: 6.8 };
+    assert.deepEqual(parseViewingCalibration(serializeViewingCalibration(calibration)), calibration);
+  }
 });
