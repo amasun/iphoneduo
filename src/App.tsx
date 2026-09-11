@@ -10,6 +10,7 @@ import { compensatedViewerRotation, DEFAULT_COMPENSATION } from './compensation'
 const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 const BASE_URL = import.meta.env.BASE_URL;
 const WALLPAPER_URL = `${BASE_URL}wallpaper.png`;
+const DEFAULT_PROFILE = 'deep';
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 const transpose = (m: number[]) => [m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]];
 const statusNames = { idle: '手动模拟', requesting: '等待授权', waiting: '等待体感', active: '体感已连接', denied: '未获授权', unavailable: '手动模拟', insecure: '需要 HTTPS', error: '连接未完成' };
@@ -42,10 +43,10 @@ export default function App() {
   const [controlsVisible, setControlsVisible] = useState(() => !isMobilePreview());
   const [panelOpen, setPanelOpen] = useState(false);
   const [intro, setIntro] = useState(true);
-  const [settings, setSettings] = useState<EffectSettings>({ ...profiles.balanced });
+  const [settings, setSettings] = useState<EffectSettings>({ ...profiles[DEFAULT_PROFILE] });
   const [viewingDistance, setViewingDistance] = useState(35);
   const [compensation, setCompensation] = useState(DEFAULT_COMPENSATION);
-  const [profile, setProfile] = useState('balanced');
+  const [profile, setProfile] = useState<string>(DEFAULT_PROFILE);
   const [yaw, setYaw] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [enabled, setEnabled] = useState(true);
@@ -294,7 +295,7 @@ export default function App() {
           {([['gentle', '轻盈', 'SUBTLE'], ['balanced', '平衡', 'BALANCED'], ['deep', '深邃', 'IMMERSIVE']] as const).map(([key, label, english]) => <button key={key} className={profile === key ? 'selected' : ''} aria-pressed={profile === key} onClick={() => { setProfile(key); setSettings({ ...profiles[key] }); }}><span>{label}{profile === key && <Check size={12} />}</span><small>{english}</small></button>)}
         </div>
 
-        <div className="section-label tuning-label"><span>02</span><h3>微调空间</h3><button className="subtle-reset" onClick={() => { setSettings({ ...profiles.balanced }); setProfile('balanced'); setCompensation(DEFAULT_COMPENSATION); setViewingDistance(35); }} aria-label="重置效果参数"><RotateCcw size={13} />还原</button></div>
+        <div className="section-label tuning-label"><span>02</span><h3>微调空间</h3><button className="subtle-reset" onClick={() => { setSettings({ ...profiles[DEFAULT_PROFILE] }); setProfile(DEFAULT_PROFILE); setCompensation(DEFAULT_COMPENSATION); setViewingDistance(35); }} aria-label="重置效果参数"><RotateCcw size={13} />还原</button></div>
         <Range label="拉伸补偿" value={compensation * 100} min={0} max={100} unit="%" onChange={v => setCompensation(v / 100)} hint="降低可减轻横向展开；大角度下补偿会平缓增长。" />
         <Range label="翻转倍率" value={usesDirectRotation ? 1 : settings.gain} min={0} max={1.3} step={0.05} unit="×" onChange={v => update('gain', v)} disabled={usesDirectRotation} hint={usesDirectRotation ? '图片等角度反向转动，固定侧整条边贴屏。' : undefined} />
         <Range label="开始失焦" value={settings.threshold} min={0} max={28} unit="°" onChange={v => update('threshold', v)} />
