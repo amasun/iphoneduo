@@ -375,7 +375,7 @@ export default function App() {
           {!immersive && <canvas ref={modelCanvas} className="phone-model-canvas" role="img" aria-label="可旋转的 iPhone 17 Pro Max 三维模型，屏幕实时呈现倾斜效果" aria-hidden={!modelAspect} />}
         </div>
         <div className="preview-footer"><span><span className={`tiny-dot ${isConnected ? 'live' : ''}`} />{statusNames[sensor.status]}</span><button onClick={() => { setImmersive(true); setPanelOpen(false); setControlsVisible(!isMobilePreview()); }}><Expand size={16} />iPhone 预览</button><button className="dashboard-settings" onClick={() => setPanelOpen(value => !value)} aria-label="打开效果调节" aria-expanded={panelOpen} aria-controls="controls"><Settings2 size={18} /><span>调节</span></button></div>
-        {!immersive && <div className="model-credit"><a href="https://sketchfab.com/3d-models/iphone-17-pro-max-87fc1df741384124a8ce0226d2b2058d" target="_blank" rel="noreferrer">iPhone 17 Pro Max</a><span>·</span><a href="https://sketchfab.com/MG990" target="_blank" rel="noreferrer">MajdyModels</a><span>·</span><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a><span>· 实时屏幕改编</span></div>}
+
         {!immersive && modelError && <p className="model-load-notice" role="status">{modelError}</p>}
       </section>
 
@@ -416,6 +416,12 @@ export default function App() {
       </section>
     </main>
 
+    {!immersive && <footer className="dashboard-footer">
+      <a className="design-credit" href="https://www.xiaohongshu.com/user/profile/5c094b50f7e8b948da476607" target="_blank" rel="noreferrer" aria-label="Design by Artgineer，打开小红书主页">
+        <span>Design by <strong>Artgineer</strong></span><span className="social-label">小红书<ArrowUpRight size={12} /></span>
+      </a>
+      <div className="model-credit"><a href="https://sketchfab.com/3d-models/iphone-17-pro-max-87fc1df741384124a8ce0226d2b2058d" target="_blank" rel="noreferrer">iPhone 17 Pro Max</a><span>·</span><a href="https://sketchfab.com/MG990" target="_blank" rel="noreferrer">MajdyModels</a><span>·</span><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a><span>· 实时屏幕改编</span></div>
+    </footer>}
 
     {showImmersiveUi && <div className={`immersive-bottom ${intro && !panelOpen ? 'with-intro' : ''}`}>
       {!panelOpen && intro && <div className="intro-card"><p>正对屏幕后启用体感</p><button className="primary-button" onClick={enableSensor}><Smartphone size={18} />启用手机体感<ArrowUpRight size={17} /></button><button className="intro-manual" onClick={manual}>手动体验</button></div>}
