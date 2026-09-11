@@ -195,9 +195,19 @@ body.immersive-viewport-active #root{position:relative;z-index:0;width:100%;heig
 .app:not(.is-immersive) .controls .tuning-label h3{font-size:14px;font-weight:500}
 .app:not(.is-immersive) .controls .subtle-reset{min-width:48px;min-height:44px;font-size:12px;padding:0 4px}
 .app:not(.is-immersive) .controls .tuning-close{display:flex;align-items:center;justify-content:center;width:44px;height:44px;padding:0;flex-shrink:0;border-radius:50%;background:#ffffff0c}
-.app:not(.is-immersive) .controls .range-field{margin:10px 0}
+.app:not(.is-immersive) .controls .range-field{display:grid;grid-template-columns:64px minmax(0,1fr) 52px;gap:8px;align-items:center;min-height:40px;margin:0}
+.app:not(.is-immersive) .controls .range-label{display:contents}
+.app:not(.is-immersive) .controls .range-label label{grid-column:1;grid-row:1;white-space:nowrap}
+.app:not(.is-immersive) .controls .range-label output{grid-column:3;grid-row:1;text-align:right;white-space:nowrap}
+.app:not(.is-immersive) .controls input[type=range]{grid-column:2;grid-row:1;margin:0;min-width:0}
 .app:not(.is-immersive) .controls .range-label :is(label,output){font-size:13px}
-.app:not(.is-immersive) .controls .instructions{font-size:12px}
+.app:not(.is-immersive) .controls .effect-switch-row{margin-top:8px;padding:0}
+.app:not(.is-immersive) .controls .instructions{font-size:12px;margin-top:0}
+.app:not(.is-immersive) .controls .instructions summary{min-height:40px}
+.app:not(.is-immersive) .iphone-preview-qr{display:flex;align-items:center;gap:16px;margin-top:4px;padding-top:12px;border-top:1px solid var(--panel-line);color:#edf1ef}
+.iphone-preview-qr img{display:block;width:128px;height:128px;flex-shrink:0;background:#fff;border-radius:10px}
+.iphone-preview-qr strong{display:block;font-size:13px;font-weight:500;margin-bottom:8px}
+.iphone-preview-qr span{display:block;font-size:11px;line-height:1.8;color:var(--panel-muted)}
 
 .app:not(.is-immersive) .simulation-panel{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:16px;width:440px;max-width:calc(100% - 32px);padding:12px 16px;border-radius:24px;z-index:6;--panel-bg:var(--glass-bg)}
 .app:not(.is-immersive) :is(.simulation-heading,.simulation-bottom){display:contents}

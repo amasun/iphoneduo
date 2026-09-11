@@ -357,6 +357,10 @@ export async function runPreviewChecks() {
     }
 
     const framedCompensation = Number(compensationInput.value) / 100;
+    // Image loading can draw once before the App's first animation frame
+    // applies its configured defaults to the renderer.
+    await waitFor(() => Math.abs(state.draws.at(-1)!.perspectiveStrength - 0.5) < 0.0001,
+      'Far-side perspective did not initialize to 50% on the GPU');
     if (perspectiveInput.min !== '0' || perspectiveInput.max !== '200' || perspectiveInput.value !== '50'
       || Math.abs(state.draws.at(-1)!.perspectiveStrength - 0.5) > 0.0001) {
       throw new Error('Far-side perspective did not initialize to 50% on the GPU');
@@ -468,7 +472,7 @@ export async function runPreviewChecks() {
     // calibration pose; subsequent readings are checked independently from
     // B^T * A * +Z rather than reusing the production orientation helper.
     const enterButton = Array.from(frameDocument.querySelectorAll<HTMLButtonElement>('.preview-footer button'))
-      .find(button => button.textContent?.includes('沉浸体验'));
+      .find(button => button.textContent?.includes('iPhone 预览'));
     if (!enterButton) throw new Error('Missing immersive preview button');
     enterButton.click();
     await waitFor(() => frameDocument.querySelector('.app')?.classList.contains('is-immersive') === true,

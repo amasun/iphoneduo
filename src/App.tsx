@@ -374,7 +374,7 @@ export default function App() {
           </div>
           {!immersive && <canvas ref={modelCanvas} className="phone-model-canvas" role="img" aria-label="可旋转的 iPhone 17 Pro Max 三维模型，屏幕实时呈现倾斜效果" aria-hidden={!modelAspect} />}
         </div>
-        <div className="preview-footer"><span><span className={`tiny-dot ${isConnected ? 'live' : ''}`} />{statusNames[sensor.status]}</span><button onClick={() => { setImmersive(true); setPanelOpen(false); setControlsVisible(!isMobilePreview()); }}><Expand size={16} />沉浸体验</button><button className="dashboard-settings" onClick={() => setPanelOpen(value => !value)} aria-label="打开效果调节" aria-expanded={panelOpen} aria-controls="controls"><Settings2 size={18} /><span>调节</span></button></div>
+        <div className="preview-footer"><span><span className={`tiny-dot ${isConnected ? 'live' : ''}`} />{statusNames[sensor.status]}</span><button onClick={() => { setImmersive(true); setPanelOpen(false); setControlsVisible(!isMobilePreview()); }}><Expand size={16} />iPhone 预览</button><button className="dashboard-settings" onClick={() => setPanelOpen(value => !value)} aria-label="打开效果调节" aria-expanded={panelOpen} aria-controls="controls"><Settings2 size={18} /><span>调节</span></button></div>
         {!immersive && <div className="model-credit"><a href="https://sketchfab.com/3d-models/iphone-17-pro-max-87fc1df741384124a8ce0226d2b2058d" target="_blank" rel="noreferrer">iPhone 17 Pro Max</a><span>·</span><a href="https://sketchfab.com/MG990" target="_blank" rel="noreferrer">MajdyModels</a><span>·</span><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a><span>· 实时屏幕改编</span></div>}
         {!immersive && modelError && <p className="model-load-notice" role="status">{modelError}</p>}
       </section>
@@ -401,6 +401,10 @@ export default function App() {
 
         <div className="effect-switch-row"><div><span>空间效果</span></div><button role="switch" aria-checked={enabled} aria-label="空间效果开关" className={`switch ${enabled ? 'on' : ''}`} onClick={() => setEnabled(v => !v)}><span /></button></div>
         <details className="instructions"><summary>使用说明<ChevronDown size={14} /></summary><p>拖动模型可左右自由旋转，上下俯仰限 ±10°，点击「回到正面」复位。</p><p>在 iPhone Safari 中启用体感并允许访问。正对屏幕校准后，保持头部不动，缓慢左右转动手机。双击画面显示或隐藏控件。</p><p>拉伸补偿调节横向展开，远侧收缩调节近大远小。透视距离填写眼睛到屏幕的距离；失焦程度越高，模糊区域越暗。</p><p>通过 Safari 分享菜单「添加到主屏幕」可全屏体验。</p></details>
+        {!immersive && <a className="iphone-preview-qr" href="https://amasun.github.io/iphoneduo/" target="_blank" rel="noreferrer" aria-label="打开 iPhone 预览，或使用相机扫描二维码">
+          <img src={`${BASE_URL}iphone-preview.svg`} width={128} height={128} alt="iPhone 预览二维码" />
+          <div><strong>iPhone 预览</strong><span>相机扫码<br />在 Safari 中打开</span></div>
+        </a>}
       </aside>
 
       <section className="simulation-panel" aria-label="手动模拟与实时读数">
