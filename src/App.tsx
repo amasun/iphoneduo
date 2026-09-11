@@ -6,6 +6,7 @@ import type { PhoneModelRenderer } from './phoneModelRenderer';
 import { DEFAULT_EFFECT_SETTINGS, effectAtAngle, MAX_BLUR, type EffectSettings } from './effect';
 import { useOrientation } from './useOrientation';
 import { useImmersiveViewport } from './useImmersiveViewport';
+import { LANGUAGE_STORAGE_KEY, readLanguage, translate } from './i18n';
 import { compensatedViewerRotation, DEFAULT_COMPENSATION } from './compensation';
 import { CALIBRATION_STORAGE_KEY, DEFAULT_CALIBRATION, parseViewingCalibration, perspectiveDistancePx, referenceShortEdge, serializeViewingCalibration } from './viewingCalibration';
 
@@ -40,10 +41,9 @@ function initialCalibration() {
   catch { return { ...DEFAULT_CALIBRATION }; }
 }
 
-function Range({ label, value, min, max, step = 1, unit, onChange, hint, disabled = false }: {
-  label: string; value: number; min: number; max: number; step?: number; unit: string; onChange: (value: number) => void; hint?: string; disabled?: boolean;
+function Range({ id, label, value, min, max, step = 1, unit, onChange, hint, disabled = false }: {
+  id: string; label: string; value: number; min: number; max: number; step?: number; unit: string; onChange: (value: number) => void; hint?: string; disabled?: boolean;
 }) {
-  const id = `range-${label}`;
   return <div className="range-field">
     <div className="range-label"><label htmlFor={id}>{label}</label><output htmlFor={id}>{step < 1 ? value.toFixed(2) : Math.round(value)}<span>{unit}</span></output></div>
     <input id={id} type="range" min={min} max={max} step={step} value={value} disabled={disabled} onChange={e => onChange(Number(e.target.value))} style={{ '--range-fill': `${(value - min) / (max - min) * 100}%` } as CSSProperties} />
@@ -52,6 +52,10 @@ function Range({ label, value, min, max, step = 1, unit, onChange, hint, disable
 }
 
 export default function App() {
+  const [language, setLanguage] = useState(readLanguage);
+  const mobilePreview = isMobilePreview();
+  const uiLanguage = mobilePreview ? 'zh' : language;
+  const t = (text: string) => translate(text, uiLanguage);
   const [immersive, setImmersive] = useState(startsImmersive);
   const [controlsVisible, setControlsVisible] = useState(() => !isMobilePreview());
   const [panelOpen, setPanelOpen] = useState(() => !startsImmersive());
@@ -87,6 +91,18 @@ export default function App() {
   const frameState = useRef({ settings, calibration, compensation, perspectiveStrength, yaw, modelPitch, playing, enabled, immersive, sensorActive: false, reducedMotion });
   frameState.current = { settings, calibration, compensation, perspectiveStrength, yaw, modelPitch, playing, enabled, immersive, sensorActive: sensor.status === 'active' || sensor.status === 'waiting', reducedMotion };
   useImmersiveViewport(immersive);
+
+  useEffect(() => {
+    document.documentElement.lang = uiLanguage === 'en' ? 'en' : 'zh-CN';
+    document.title = translate('INSIDE — 屏幕之内', uiLanguage);
+    document.querySelector('meta[name="description"]')?.setAttribute('content',
+      translate('倾斜手机，看画面停留在视线里，再退入屏幕深处。一个可以亲手体验的空间视觉实验。', uiLanguage));
+  }, [uiLanguage]);
+
+  useEffect(() => {
+    try { window.localStorage.setItem(LANGUAGE_STORAGE_KEY, language); }
+    catch { /* Language switching still works when storage is unavailable. */ }
+  }, [language]);
 
   useEffect(() => {
     if (immersive) {
@@ -354,83 +370,90 @@ export default function App() {
   const isConnected = sensor.status === 'active';
   const isBusy = sensor.status === 'requesting' || sensor.status === 'waiting';
   const showImmersiveUi = immersive && controlsVisible;
+  const languageButton = !mobilePreview && <button className={`language-switch ${immersive ? 'glass-button' : ''}`}
+    onClick={() => setLanguage(value => value === 'zh' ? 'en' : 'zh')}
+    aria-label={t(language === 'zh' ? '切换为英语' : '切换为中文')} lang={language === 'zh' ? 'en' : 'zh-CN'}>
+    {language === 'zh' ? 'EN' : '中文'}
+  </button>;
 
-  return <div className={`app ${immersive ? 'is-immersive' : ''}`}>
+  return <div data-language={uiLanguage} className={`app ${immersive ? 'is-immersive' : ''}`}>
     <header className="topbar">
-      <a className="wordmark" href={BASE_URL} aria-label="INSIDE 首页"><span>INSIDE.</span></a>
+      <a className="wordmark" href={BASE_URL} aria-label={t('INSIDE 首页')}><span>INSIDE.</span></a>
+      {!immersive && languageButton}
     </header>
 
     <main className="workspace">
-      <section className="preview-panel" aria-label="空间效果预览">
+      <section className="preview-panel" aria-label={t('空间效果预览')}>
         <div className={`stage ${!immersive && modelAspect ? 'model-ready' : ''}`} style={modelAspect ? { '--model-screen-aspect': modelAspect } as CSSProperties : undefined} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={finishGesture} onPointerCancel={cancelGesture} onLostPointerCapture={() => { if (tap.current) cancelGesture(); }}>
           <div className="device-shadow" aria-hidden="true" />
           <div className="device" ref={device}>
             <div className="device-button button-one" aria-hidden="true" /><div className="device-button button-two" aria-hidden="true" /><div className="device-button button-three" aria-hidden="true" />
             <div className="screen">
-              <img ref={fallback} className={`fallback-image ${rendererError ? 'visible' : ''}`} src={WALLPAPER_URL} alt="雪山日落锁屏演示，包含原图的时间与天气信息" draggable="false" />
-              <canvas ref={canvas} className={rendererError ? 'canvas-hidden' : ''} aria-label="随手机倾斜反向旋转、下沉并逐渐失焦的雪山画面" role="img" />
+              <img ref={fallback} className={`fallback-image ${rendererError ? 'visible' : ''}`} src={WALLPAPER_URL} alt={t('雪山日落锁屏演示，包含原图的时间与天气信息')} draggable="false" />
+              <canvas ref={canvas} className={rendererError ? 'canvas-hidden' : ''} aria-label={t('随手机倾斜反向旋转、下沉并逐渐失焦的雪山画面')} role="img" />
               <div className="screen-glass" aria-hidden="true" />
             </div>
           </div>
-          {!immersive && <canvas ref={modelCanvas} className="phone-model-canvas" role="img" aria-label="可旋转的 iPhone 17 Pro Max 三维模型，屏幕实时呈现倾斜效果" aria-hidden={!modelAspect} />}
+          {!immersive && <canvas ref={modelCanvas} className="phone-model-canvas" role="img" aria-label={t('可旋转的 iPhone 17 Pro Max 三维模型，屏幕实时呈现倾斜效果')} aria-hidden={!modelAspect} />}
         </div>
-        <div className="preview-footer"><span><span className={`tiny-dot ${isConnected ? 'live' : ''}`} />{statusNames[sensor.status]}</span><button onClick={() => { setImmersive(true); setPanelOpen(false); setControlsVisible(!isMobilePreview()); }}><Expand size={16} />iPhone 预览</button><button className="dashboard-settings" onClick={() => setPanelOpen(value => !value)} aria-label="打开效果调节" aria-expanded={panelOpen} aria-controls="controls"><Settings2 size={18} /><span>调节</span></button></div>
+        <div className="preview-footer"><span><span className={`tiny-dot ${isConnected ? 'live' : ''}`} />{t(statusNames[sensor.status])}</span><button onClick={() => { setImmersive(true); setPanelOpen(false); setControlsVisible(!isMobilePreview()); }}><Expand size={16} />{t('iPhone 预览')}</button><button className="dashboard-settings" onClick={() => setPanelOpen(value => !value)} aria-label={t('打开效果调节')} aria-expanded={panelOpen} aria-controls="controls"><Settings2 size={18} /><span>{t('调节')}</span></button></div>
 
-        {!immersive && modelError && <p className="model-load-notice" role="status">{modelError}</p>}
+        {!immersive && modelError && <p className="model-load-notice" role="status">{t(modelError)}</p>}
       </section>
 
       {showImmersiveUi && <div className="immersive-toolbar">
-        <button className="glass-button" onClick={() => { setImmersive(false); setIntro(false); }} aria-label="退出沉浸体验"><Maximize2 size={18} /></button>
+        <button className="glass-button" onClick={() => { setImmersive(false); setIntro(false); }} aria-label={t('退出沉浸体验')}><Maximize2 size={18} /></button>
+        {languageButton}
       </div>}
-      {showImmersiveUi && panelOpen && <button className="panel-backdrop" aria-label="关闭效果调节" onClick={() => setPanelOpen(false)} />}
+      {showImmersiveUi && panelOpen && <button className="panel-backdrop" aria-label={t('关闭效果调节')} onClick={() => setPanelOpen(false)} />}
 
-      <aside id="controls" className={`controls ${panelOpen && (!immersive || controlsVisible) ? 'panel-open' : ''}`} aria-label="效果调节">
+      <aside id="controls" className={`controls ${panelOpen && (!immersive || controlsVisible) ? 'panel-open' : ''}`} aria-label={t('效果调节')}>
 
         <div className="connection-card">
-          <button className="primary-button" onClick={isConnected ? reset : enableSensor} disabled={sensor.status === 'requesting'}>{isConnected ? <Crosshair size={17} /> : <MoveUpRight size={17} />}{isConnected ? '重新校准正面' : isBusy ? '重新连接体感' : '启用手机体感'}</button>
-          {sensor.status !== 'idle' && <p className={`sensor-message ${['denied', 'insecure', 'error'].includes(sensor.status) ? 'attention' : ''}`} role="status">{sensor.message}</p>}
-          {(isConnected || isBusy) && <button className="text-button" onClick={manual}>切换到手动模拟</button>}
+          <button className="primary-button" onClick={isConnected ? reset : enableSensor} disabled={sensor.status === 'requesting'}>{isConnected ? <Crosshair size={17} /> : <MoveUpRight size={17} />}{isConnected ? t('重新校准正面') : isBusy ? t('重新连接体感') : t('启用手机体感')}</button>
+          {sensor.status !== 'idle' && <p className={`sensor-message ${['denied', 'insecure', 'error'].includes(sensor.status) ? 'attention' : ''}`} role="status">{t(sensor.message)}</p>}
+          {(isConnected || isBusy) && <button className="text-button" onClick={manual}>{t('切换到手动模拟')}</button>}
         </div>
 
-        <div className="section-label tuning-label"><h3>微调空间</h3><button className="subtle-reset" onClick={() => { setSettings({ ...DEFAULT_EFFECT_SETTINGS }); setCompensation(DEFAULT_COMPENSATION); setPerspectiveStrength(DEFAULT_PERSPECTIVE_STRENGTH); setCalibration({ ...DEFAULT_CALIBRATION }); }} aria-label="重置效果参数"><RotateCcw size={13} />还原</button><button className="panel-close tuning-close" onClick={() => setPanelOpen(false)} aria-label="关闭参数面板"><X size={18} /></button></div>
-        <Range label="拉伸补偿" value={compensation * 100} min={0} max={100} unit="%" onChange={v => setCompensation(v / 100)} />
-        <Range label="远侧收缩" value={perspectiveStrength * 100} min={0} max={200} unit="%" onChange={v => setPerspectiveStrength(v / 100)} />
-        <Range label="开始失焦" value={settings.threshold} min={0} max={28} unit="°" onChange={v => update('threshold', v)} />
-        <Range label="透视距离" value={calibration.distanceCm} min={20} max={100} unit="cm" onChange={v => setCalibration(c => ({ ...c, distanceCm: v }))} />
-        <Range label="失焦程度" value={settings.blur} min={0} max={MAX_BLUR} unit="px" onChange={v => update('blur', v)} />
+        <div className="section-label tuning-label"><h3>{t('微调空间')}</h3><button className="subtle-reset" onClick={() => { setSettings({ ...DEFAULT_EFFECT_SETTINGS }); setCompensation(DEFAULT_COMPENSATION); setPerspectiveStrength(DEFAULT_PERSPECTIVE_STRENGTH); setCalibration({ ...DEFAULT_CALIBRATION }); }} aria-label={t('重置效果参数')}><RotateCcw size={13} />{t('还原')}</button><button className="panel-close tuning-close" onClick={() => setPanelOpen(false)} aria-label={t('关闭参数面板')}><X size={18} /></button></div>
+        <Range id="range-拉伸补偿" label={t('拉伸补偿')} value={compensation * 100} min={0} max={100} unit="%" onChange={v => setCompensation(v / 100)} />
+        <Range id="range-远侧收缩" label={t('远侧收缩')} value={perspectiveStrength * 100} min={0} max={200} unit="%" onChange={v => setPerspectiveStrength(v / 100)} />
+        <Range id="range-开始失焦" label={t('开始失焦')} value={settings.threshold} min={0} max={28} unit="°" onChange={v => update('threshold', v)} />
+        <Range id="range-透视距离" label={t('透视距离')} value={calibration.distanceCm} min={20} max={100} unit="cm" onChange={v => setCalibration(c => ({ ...c, distanceCm: v }))} />
+        <Range id="range-失焦程度" label={t('失焦程度')} value={settings.blur} min={0} max={MAX_BLUR} unit="px" onChange={v => update('blur', v)} />
 
-        <div className="effect-switch-row"><div><span>空间效果</span></div><button role="switch" aria-checked={enabled} aria-label="空间效果开关" className={`switch ${enabled ? 'on' : ''}`} onClick={() => setEnabled(v => !v)}><span /></button></div>
-        <details className="instructions"><summary>使用说明<ChevronDown size={14} /></summary><p>拖动模型可左右自由旋转，上下俯仰限 ±10°，点击「回到正面」复位。</p><p>在 iPhone Safari 中启用体感并允许访问。正对屏幕校准后，保持头部不动，缓慢左右转动手机。双击画面显示或隐藏控件。</p><p>拉伸补偿调节横向展开，远侧收缩调节近大远小。透视距离填写眼睛到屏幕的距离；失焦程度越高，模糊区域越暗。</p><p><strong>iPhone 全屏体验</strong><br />用 Safari 打开本页，点击「分享」→「添加到主屏幕」→「添加」。如出现「作为 Web App 打开」，请保持开启。随后回到手机桌面，点击新添加的 INSIDE 图标，即可在没有 Safari 地址栏和工具栏的界面中体验。进入后双击画面显示控件，再启用体感。</p></details>
-        {!immersive && <a className="iphone-preview-qr" href="https://amasun.github.io/iphoneduo/" target="_blank" rel="noreferrer" aria-label="打开 iPhone 预览，或使用相机扫描二维码">
-          <img src={`${BASE_URL}iphone-preview.svg`} width={128} height={128} alt="iPhone 预览二维码" />
-          <div><strong>iPhone 预览</strong><span>相机扫码<br />在 Safari 中打开</span></div>
+        <div className="effect-switch-row"><div><span>{t('空间效果')}</span></div><button role="switch" aria-checked={enabled} aria-label={t('空间效果开关')} className={`switch ${enabled ? 'on' : ''}`} onClick={() => setEnabled(v => !v)}><span /></button></div>
+        <details className="instructions"><summary>{t('使用说明')}<ChevronDown size={14} /></summary><p>{t('拖动模型可左右自由旋转，上下俯仰限 ±10°，点击「回到正面」复位。')}</p><p>{t('在 iPhone Safari 中启用体感并允许访问。正对屏幕校准后，保持头部不动，缓慢左右转动手机。双击画面显示或隐藏控件。')}</p><p>{t('拉伸补偿调节横向展开，远侧收缩调节近大远小。透视距离填写眼睛到屏幕的距离；失焦程度越高，模糊区域越暗。')}</p><p><strong>{t('iPhone 全屏体验')}</strong><br />{t('用 Safari 打开本页，点击「分享」→「添加到主屏幕」→「添加」。如出现「作为 Web App 打开」，请保持开启。随后回到手机桌面，点击新添加的 INSIDE 图标，即可在没有 Safari 地址栏和工具栏的界面中体验。进入后双击画面显示控件，再启用体感。')}</p></details>
+        {!immersive && <a className="iphone-preview-qr" href="https://amasun.github.io/iphoneduo/" target="_blank" rel="noreferrer" aria-label={t('打开 iPhone 预览，或使用相机扫描二维码')}>
+          <img src={`${BASE_URL}iphone-preview.svg`} width={128} height={128} alt={t('iPhone 预览二维码')} />
+          <div><strong>{t('iPhone 预览')}</strong><span>{t('相机扫码')}<br />{t('在 Safari 中打开')}</span></div>
         </a>}
       </aside>
 
-      <section className="simulation-panel" aria-label="手动模拟与实时读数">
-        <div className="simulation-heading"><h2>旋转</h2><button className="demo-button" onClick={activateDemo} aria-label={playing ? '暂停演示' : '播放演示'} title={playing ? '暂停演示' : '播放演示'}>{playing ? <Pause size={18} /> : <Play size={18} />}<span>{playing ? '暂停演示' : '播放演示'}</span></button></div>
+      <section className="simulation-panel" aria-label={t('手动模拟与实时读数')}>
+        <div className="simulation-heading"><h2>{t('旋转')}</h2><button className="demo-button" onClick={activateDemo} aria-label={playing ? t('暂停演示') : t('播放演示')} title={playing ? t('暂停演示') : t('播放演示')}>{playing ? <Pause size={18} /> : <Play size={18} />}<span>{playing ? t('暂停演示') : t('播放演示')}</span></button></div>
         <div className="simulation-grid"><div className="manual-controls">
-          <Range label="左右倾斜" value={immersive ? yaw : wrapDegrees(yaw)} min={immersive ? -MAX_YAW : -180} max={immersive ? MAX_YAW : 180} unit="°" onChange={v => { manual(); setYaw(v); }} />
+          <Range id="range-左右倾斜" label={t('左右倾斜')} value={immersive ? yaw : wrapDegrees(yaw)} min={immersive ? -MAX_YAW : -180} max={immersive ? MAX_YAW : 180} unit="°" onChange={v => { manual(); setYaw(v); }} />
         </div></div>
-        <div className="simulation-bottom"><span>拖动查看机身</span><button onClick={reset} aria-label="回到正面" title="回到正面"><RotateCcw size={18} /><span>回到正面</span></button></div>
+        <div className="simulation-bottom"><span>{t('拖动查看机身')}</span><button onClick={reset} aria-label={t('回到正面')} title={t('回到正面')}><RotateCcw size={18} /><span>{t('回到正面')}</span></button></div>
       </section>
     </main>
 
     {!immersive && <footer className="dashboard-footer">
-      <a className="design-credit" href="https://www.xiaohongshu.com/user/profile/5c094b50f7e8b948da476607" target="_blank" rel="noreferrer" aria-label="Design by Artgineer，打开小红书主页">
-        <span>Design by <strong>Artgineer</strong></span><span className="social-label">小红书<ArrowUpRight size={12} /></span>
+      <a className="design-credit" href="https://www.xiaohongshu.com/user/profile/5c094b50f7e8b948da476607" target="_blank" rel="noreferrer" aria-label={t('Design by Artgineer，打开小红书主页')}>
+        <span>Design by <strong>Artgineer</strong></span><span className="social-label">{t('小红书')}<ArrowUpRight size={12} /></span>
       </a>
-      <div className="model-credit"><a href="https://sketchfab.com/3d-models/iphone-17-pro-max-87fc1df741384124a8ce0226d2b2058d" target="_blank" rel="noreferrer">iPhone 17 Pro Max</a><span>·</span><a href="https://sketchfab.com/MG990" target="_blank" rel="noreferrer">MajdyModels</a><span>·</span><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a><span>· 实时屏幕改编</span></div>
+      <div className="model-credit"><a href="https://sketchfab.com/3d-models/iphone-17-pro-max-87fc1df741384124a8ce0226d2b2058d" target="_blank" rel="noreferrer">iPhone 17 Pro Max</a><span>·</span><a href="https://sketchfab.com/MG990" target="_blank" rel="noreferrer">MajdyModels</a><span>·</span><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a><span>{t('· 实时屏幕改编')}</span></div>
     </footer>}
 
     {showImmersiveUi && <div className={`immersive-bottom ${intro && !panelOpen ? 'with-intro' : ''}`}>
-      {!panelOpen && intro && <div className="intro-card"><p>正对屏幕后启用体感</p><button className="primary-button" onClick={enableSensor}><Smartphone size={18} />启用手机体感<ArrowUpRight size={17} /></button><button className="intro-manual" onClick={manual}>手动体验</button></div>}
-      {!panelOpen && !intro && !isConnected && sensor.status !== 'idle' && <p className="immersive-message" role="status">{sensor.message}</p>}
+      {!panelOpen && intro && <div className="intro-card"><p>{t('正对屏幕后启用体感')}</p><button className="primary-button" onClick={enableSensor}><Smartphone size={18} />{t('启用手机体感')}<ArrowUpRight size={17} /></button><button className="intro-manual" onClick={manual}>{t('手动体验')}</button></div>}
+      {!panelOpen && !intro && !isConnected && sensor.status !== 'idle' && <p className="immersive-message" role="status">{t(sensor.message)}</p>}
       <div className={`immersive-actions ${intro || panelOpen ? 'settings-only' : ''}`}>
-        {!panelOpen && !intro && <><button className="glass-button status-button" onClick={isConnected ? reset : enableSensor}>{isConnected ? <Crosshair size={15} /> : <Smartphone size={15} />}{isConnected ? '校准正面' : '启用体感'}</button><span className="angle-pill">{Math.abs(metrics.angle).toFixed(0)}° <span>{metrics.hinge === 'left' ? '左侧' : '右侧'}固定</span></span><button className="glass-button" aria-label={playing ? '暂停演示' : '播放演示'} onClick={activateDemo}>{playing ? <Pause size={17} /> : <Play size={17} />}</button></>}
-        <button className="glass-button immersive-settings" onClick={() => setPanelOpen(v => !v)} aria-expanded={panelOpen} aria-controls="controls" aria-label="打开效果调节"><Settings2 size={19} /></button>
+        {!panelOpen && !intro && <><button className="glass-button status-button" onClick={isConnected ? reset : enableSensor}>{isConnected ? <Crosshair size={15} /> : <Smartphone size={15} />}{isConnected ? t('校准正面') : t('启用体感')}</button><span className="angle-pill">{Math.abs(metrics.angle).toFixed(0)}° <span>{metrics.hinge === 'left' ? t('左侧固定') : t('右侧固定')}</span></span><button className="glass-button" aria-label={playing ? t('暂停演示') : t('播放演示')} onClick={activateDemo}>{playing ? <Pause size={17} /> : <Play size={17} />}</button></>}
+        <button className="glass-button immersive-settings" onClick={() => setPanelOpen(v => !v)} aria-expanded={panelOpen} aria-controls="controls" aria-label={t('打开效果调节')}><Settings2 size={19} /></button>
       </div>
     </div>}
-    {rendererError && (!immersive || controlsVisible) && <div className="render-notice" role="status">{rendererError} 当前使用基础模糊预览。</div>}
+    {rendererError && (!immersive || controlsVisible) && <div className="render-notice" role="status">{t(rendererError)} {t('当前使用基础模糊预览。')}</div>}
   </div>;
 }

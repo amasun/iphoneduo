@@ -263,3 +263,12 @@ body.immersive-viewport-active #root{position:relative;z-index:0;width:100%;heig
   .design-credit{font-size:11px}
   .app:not(.is-immersive) .dashboard-footer .model-credit{justify-content:center;font-size:8px}
 }
+
+.app:not(.is-immersive) .topbar{gap:18px}
+.language-switch{display:flex;align-items:center;justify-content:center;min-width:44px;min-height:40px;padding:0 10px;font-size:12px;line-height:1;pointer-events:auto;cursor:pointer}
+.app:not(.is-immersive) .language-switch{color:#35483d;background:#f4f6f4;border:1px solid #dce2dd;border-radius:20px}
+.app:not(.is-immersive) .language-switch:hover{background:#e8ede9}
+.app:not(.is-immersive) .language-switch:focus-visible{outline:2px solid #35483d;outline-offset:3px}
+.app[data-language=en]:not(.is-immersive) .controls .range-field{grid-template-columns:108px minmax(0,1fr) 48px}
+.app[data-language=en] .controls .range-label label{font-size:12px}
+.app[data-language=en].is-immersive .controls .range-field{grid-template-columns:108px minmax(0,1fr) 48px;gap:8px}
