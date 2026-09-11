@@ -335,13 +335,13 @@ export async function runPreviewChecks() {
     const device = frameDocument.querySelector<HTMLElement>('.device');
     if (!yawInput || !compensationInput || !stage || !device) throw new Error('Preview App controls are incomplete');
     if (compensationInput.min !== '0' || compensationInput.max !== '100'
-      || compensationInput.value !== '50') {
-      throw new Error(`Stretch compensation range is not the default 0..100/50: ${compensationInput.min}..${compensationInput.max}/${compensationInput.value}`);
+      || compensationInput.value !== '100') {
+      throw new Error(`Stretch compensation range is not the default 0..100/100: ${compensationInput.min}..${compensationInput.max}/${compensationInput.value}`);
     }
 
     // This control is independent of the visual effect presets. Set a
     // non-default value, select a preset, and verify that the camera tuning
-    // survives the settings replacement before restoring the documented 50%.
+    // survives the settings replacement before restoring the documented 100%.
     setRangeValue(frameWindow, compensationInput, 73);
     await waitFor(() => compensationInput.value === '73',
       'Stretch compensation slider did not accept 73%');
@@ -354,9 +354,9 @@ export async function runPreviewChecks() {
     if (compensationInput.value !== compensationBeforePreset) {
       throw new Error('Effect preset reset independent stretch compensation');
     }
-    setRangeValue(frameWindow, compensationInput, 50);
-    await waitFor(() => compensationInput.value === '50',
-      'Stretch compensation slider did not restore its 50% default');
+    setRangeValue(frameWindow, compensationInput, 100);
+    await waitFor(() => compensationInput.value === '100',
+      'Stretch compensation slider did not restore its 100% default');
     const framedCompensation = Number(compensationInput.value) / 100;
 
     const profiles: Array<[string, string]> = [
@@ -633,9 +633,12 @@ export async function runPreviewChecks() {
 
     const resetButton = frameDocument.querySelector<HTMLButtonElement>('.subtle-reset');
     if (!resetButton) throw new Error('Missing effect reset button');
-    resetButton.click();
+    setRangeValue(frameWindow, compensationInput, 50);
     await waitFor(() => compensationInput.value === '50',
-      'Effect reset did not restore 50% compensation');
+      'Stretch compensation slider did not accept 50% before reset');
+    resetButton.click();
+    await waitFor(() => compensationInput.value === '100',
+      'Effect reset did not restore 100% compensation');
 
     return { framed: results, sensor: sensorResults, stretch: stretchResults,
       highAngle: highAngleResults, resetCompensation: Number(compensationInput.value),

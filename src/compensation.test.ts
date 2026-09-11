@@ -26,24 +26,24 @@ function projectedWidth(angle: number, observer: number[]) {
 
 test('zero compensation restores fixed-eye perspective; neutral pose stays unchanged', () => {
   const identity = [1, 0, 0, 0, 1, 0, 0, 0, 1];
-  for (const strength of [0, DEFAULT_COMPENSATION, 1]) {
+  for (const strength of [0, 0.5, DEFAULT_COMPENSATION]) {
     compensatedViewerRotation(0, 0, strength).forEach((v, i) => close(v, identity[i]));
     close(projectedWidth(0, compensatedViewerRotation(0, 0, strength)), width);
   }
   compensatedViewerRotation(75, -30, 0).forEach((v, i) => close(v, identity[i]));
 });
 
-test('default compensation restores width gradually without the old expansion', () => {
+test('half compensation restores width gradually without the old expansion', () => {
   let previous = width;
   for (const angle of [15, 30, 45, 60, 80]) {
-    const camera = compensatedViewerRotation(angle, 0);
+    const camera = compensatedViewerRotation(angle, 0, 0.5);
     const result = projectedWidth(angle, camera);
     const uncompensated = projectedWidth(angle, compensatedViewerRotation(angle, 0, 0));
     const a = radians(angle);
     const oldFull = projectedWidth(angle, [Math.cos(a), 0, Math.sin(a), 0, 1, 0, -Math.sin(a), 0, Math.cos(a)]);
-    assert.ok(result > uncompensated && result < oldFull, `${angle}: default must lie between the two former modes`);
-    assert.ok(result < previous && result < width, `${angle}: default must leave the free edge inside the screen`);
-    close(projectedWidth(-angle, compensatedViewerRotation(-angle, 0)), result);
+    assert.ok(result > uncompensated && result < oldFull, `${angle}: half compensation must lie between the two former modes`);
+    assert.ok(result < previous && result < width, `${angle}: half compensation must leave the free edge inside the screen`);
+    close(projectedWidth(-angle, compensatedViewerRotation(-angle, 0, 0.5)), result);
     previous = result;
   }
 });

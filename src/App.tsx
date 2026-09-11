@@ -142,8 +142,8 @@ export default function App() {
       const shortEdge = Math.min(canvas.current?.clientWidth ?? 390, canvas.current?.clientHeight ?? 844);
       const perspective = s.viewingDistance / 7 * shortEdge;
       const physicalRotation = pose.current;
-      // Partial compensation restores some apparent width without the former
-      // full-angle expansion. The same camera rule applies to each preview.
+      // Adjustable compensation restores apparent width with a smooth limit
+      // at high angles. The same camera rule applies to each preview.
       const viewerRotation = compensatedViewerRotation(angle, observer.pitch, s.compensation);
       const signature = [...rotation, ...viewerRotation, amount.blur, amount.dim, scale, perspective, Number(s.immersive), Number(hinge === 'right')];
       if (signature.some((value, i) => Math.abs(value - (previousDraw[i] ?? Infinity)) > 0.00001)) {
