@@ -49,10 +49,10 @@ body.immersive-viewport-active #root{position:relative;z-index:0;width:100%;heig
 .is-immersive .controls.panel-open{
   top:auto;
   right:calc(100% - var(--immersive-viewport-right,100%) + max(12px,env(safe-area-inset-right,0px)));
-  bottom:calc(100% - var(--immersive-viewport-bottom,100%) + env(safe-area-inset-bottom,0px) + 78px);left:auto;width:304px;height:auto;
+  bottom:calc(100% - var(--immersive-viewport-bottom,100%) + env(safe-area-inset-bottom,0px) + 82px);left:auto;width:360px;height:auto;
   max-width:calc(var(--immersive-viewport-width,100vw) - 24px);
   max-height:calc(var(--immersive-viewport-height,100vh) - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 90px);
-  padding:8px 12px 12px;border-radius:16px;
+  padding:10px 16px 14px;border-radius:24px;
   box-shadow:0 8px 28px #0003;
   animation:tuning-enter .18s ease-out;
 }
@@ -76,39 +76,43 @@ body.immersive-viewport-active #root{position:relative;z-index:0;width:100%;heig
 .is-immersive .controls>.instructions,
 .is-immersive .controls .field-hint{display:none}
 .is-immersive .controls .tuning-label{margin:0 0 4px;min-height:44px;gap:6px}
-.is-immersive .controls .tuning-label h3{font-size:13px}
-.is-immersive .controls .subtle-reset{font-size:11px;min-width:44px;min-height:44px;padding:0 4px}
+.is-immersive .controls .tuning-label h3{font-size:15px;font-weight:600;letter-spacing:0}
+.is-immersive .controls .subtle-reset{font-size:13px;min-width:52px;min-height:44px;padding:0 6px}
 .is-immersive .controls .tuning-close{display:flex;min-width:44px;min-height:44px;padding:0;margin:0}
-.is-immersive .controls .range-field{display:grid;grid-template-columns:60px minmax(0,1fr) 47px;gap:8px;align-items:center;min-height:44px;margin:0}
+.is-immersive .controls .range-field{display:grid;grid-template-columns:64px minmax(0,1fr) 54px;gap:10px;align-items:center;min-height:56px;margin:0}
 .is-immersive .controls .range-label{display:contents}
-.is-immersive .controls .range-label label{grid-column:1;grid-row:1;font-size:12px}
-.is-immersive .controls .range-label output{grid-column:3;grid-row:1;text-align:right;font-size:12px;white-space:nowrap}
+.is-immersive .controls .range-label label{grid-column:1;grid-row:1;font-size:14px;white-space:nowrap}
+.is-immersive .controls .range-label output{grid-column:3;grid-row:1;text-align:right;font-size:14px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .is-immersive .controls .range-label output span{margin-left:2px}
-.is-immersive .controls input[type=range]{grid-column:2;grid-row:1;height:44px;margin:0;min-width:0}
+.is-immersive .controls input[type=range]{grid-column:2;grid-row:1;height:56px;margin:0;min-width:0}
 
-/* Shared dark surfaces for settings, manual controls and sensor setup. */
+/* Shared frosted material, including the floating settings button. */
+:root{--glass-bg:rgba(24,32,28,.6);--glass-border:#ffffff24;--glass-blur:blur(18px);--glass-shadow:inset 0 1px 0 #ffffff14,0 12px 36px #0003}
+:is(.glass-button,.angle-pill,.immersive-message,.render-notice){background:var(--glass-bg);border:1px solid var(--glass-border);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);box-shadow:var(--glass-shadow)}
 .controls,.simulation-panel,.intro-card{
-  --panel-bg:#191d23;--panel-line:#3d4652;--panel-muted:#b6c0cc;--panel-accent:#b8d5a1;
-  color-scheme:dark;color:#f0f3f7;background:var(--panel-bg);border-color:var(--panel-line);
+  --panel-bg:var(--glass-bg);--panel-line:#ffffff24;--panel-muted:#ced5d2;--panel-accent:#e2ecdd;
+  color-scheme:dark;color:#fff;background:var(--panel-bg);border:1px solid var(--panel-line);
+  backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);box-shadow:var(--glass-shadow);
 }
-.app:not(.is-immersive) .controls{padding:20px;border:1px solid var(--panel-line);border-radius:18px;align-self:start}
-.is-immersive .controls.panel-open,.is-immersive .intro-card{background:rgba(25,29,35,.97);box-shadow:inset 0 0 0 1px #ffffff14,0 8px 28px #0005}
+.app:not(.is-immersive) :is(.controls,.simulation-panel){--panel-bg:rgba(24,32,28,.8);border-radius:24px}
+.app:not(.is-immersive) .controls{padding:20px;align-self:start}
+.is-immersive .controls.panel-open,.is-immersive .intro-card{background:var(--panel-bg);border:1px solid var(--panel-line);box-shadow:var(--glass-shadow);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur)}
 :is(.controls,.simulation-panel,.intro-card) :is(.eyebrow,.lead,.field-hint,.geometry-note,.instructions,.hinge-status,.sensor-message,.connection-title div>span,.readouts>div>span,.readouts small,.simulation-bottom),
 .intro-card p,.intro-card .intro-manual{color:var(--panel-muted)}
 :is(.controls,.simulation-panel) .range-label label{color:#d1d8e1}
 :is(.controls,.simulation-panel) .range-label output{color:#f0f3f7}
 :is(.controls,.simulation-panel) .range-label output span{color:var(--panel-muted)}
 :is(.controls,.simulation-panel) input[type=range]::-webkit-slider-runnable-track{background:linear-gradient(to right,var(--panel-accent) var(--range-fill),#586575 var(--range-fill))}
-:is(.controls,.simulation-panel) input[type=range]::-webkit-slider-thumb{background:#eff6e8;border-color:var(--panel-accent);box-shadow:0 0 0 2px var(--panel-bg)}
+:is(.controls,.simulation-panel) input[type=range]::-webkit-slider-thumb{background:#fff;border:0;box-shadow:0 1px 4px #0004}
 :is(.controls,.simulation-panel) input[type=range]::-moz-range-track{background:#586575}
 :is(.controls,.simulation-panel) input[type=range]::-moz-range-progress{background:var(--panel-accent)}
-:is(.controls,.simulation-panel) input[type=range]::-moz-range-thumb{background:#eff6e8;border-color:var(--panel-accent)}
-.controls .connection-card{background:#232a33;border-color:var(--panel-line)}
-.controls .connection-icon{background:#303b32;border-color:#53654b;color:var(--panel-accent)}
+:is(.controls,.simulation-panel) input[type=range]::-moz-range-thumb{background:#fff;border:0;box-shadow:0 1px 4px #0004}
+.controls .connection-card{background:#ffffff08;border-color:var(--panel-line)}
+.controls .connection-icon{background:#ffffff0c;border-color:#ffffff24;color:var(--panel-accent)}
 .controls .sensor-message.attention{color:#ffd09a}
 :is(.controls,.simulation-panel,.intro-card) :is(.primary-button,.demo-button){background:var(--panel-accent);color:#1c2916;border-color:var(--panel-accent)}
 :is(.controls,.intro-card) .primary-button>span{color:#354a2b}
-:is(.controls,.simulation-panel,.intro-card) :is(.primary-button,.demo-button):hover{background:#a4c68a}
+:is(.controls,.simulation-panel,.intro-card) :is(.primary-button,.demo-button):hover{background:#f1f6ee}
 :is(.controls,.simulation-panel) :is(.subtle-reset,.hinge-status button,.simulation-bottom button){color:#cfdec3}
 :is(.controls,.simulation-panel) :is(.effect-switch-row,.manual-controls,.readouts,.simulation-bottom){border-color:var(--panel-line)}
 .controls .effect-switch-row>div{color:#d1d8e1}
@@ -117,6 +121,41 @@ body.immersive-viewport-active #root{position:relative;z-index:0;width:100%;heig
 .controls .switch.on>span{background:#24301e}
 :is(.controls,.simulation-panel,.intro-card) :is(button,a,input,summary):focus-visible{outline-color:var(--panel-accent)}
 .controls :is(.subtle-reset,.panel-close):hover{color:#fff;background:#ffffff0d;border-radius:6px}
+
+/* Larger hit regions without turning the floating controls into a full sheet. */
+.is-immersive :is(.glass-button,.angle-pill){min-width:48px;min-height:48px}
+.is-immersive .angle-pill{height:48px}
+.is-immersive .immersive-settings svg{width:22px;height:22px}
+.is-immersive .status-button{font-size:13px}
+.is-immersive .intro-card{border-radius:24px}
+.is-immersive .intro-card p,.is-immersive .intro-manual{font-size:14px}
+.is-immersive .intro-card .primary-button{min-height:48px;font-size:15px;border-radius:14px}
+.is-immersive .controls .tuning-close{border-radius:50%;background:#ffffff0c}
+.is-immersive .controls input[type=range]{touch-action:pan-y}
+.is-immersive .controls input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:4px}
+.is-immersive .controls input[type=range]::-webkit-slider-thumb{width:24px;height:24px;margin-top:-10px}
+.is-immersive .controls input[type=range]::-moz-range-track,.is-immersive .controls input[type=range]::-moz-range-progress{height:4px;border-radius:4px}
+.is-immersive .controls input[type=range]::-moz-range-thumb{width:24px;height:24px}
+@media(hover:hover){.glass-button:hover{background:rgba(24,32,28,.75)}}
+@media(max-width:380px){.is-immersive .angle-pill>span{display:none}}
+@media(max-width:360px){
+  .is-immersive .controls.panel-open{padding-inline:12px}
+  .is-immersive .controls .range-field{grid-template-columns:60px minmax(0,1fr) 50px;gap:8px}
+  .is-immersive .controls .range-label label,.is-immersive .controls .range-label output{font-size:13px}
+  .is-immersive .angle-pill{padding-inline:10px}
+  .is-immersive .status-button{padding-inline:10px;font-size:12px}
+}
+@media(pointer:coarse){
+  .app:not(.is-immersive) :is(.controls,.simulation-panel) input[type=range]{height:44px}
+  .app:not(.is-immersive) :is(.controls,.simulation-panel) input[type=range]::-webkit-slider-thumb{width:24px;height:24px;margin-top:-10.5px}
+  .app:not(.is-immersive) :is(.controls,.simulation-panel) input[type=range]::-moz-range-thumb{width:24px;height:24px}
+}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .controls,.simulation-panel,.intro-card,.is-immersive .controls.panel-open,.is-immersive .intro-card,.glass-button,.angle-pill,.immersive-message,.render-notice{background:#202824}
+}
+@media(prefers-reduced-transparency:reduce){
+  .controls,.simulation-panel,.intro-card,.is-immersive .controls.panel-open,.is-immersive .intro-card,.glass-button,.angle-pill,.immersive-message,.render-notice{background:#202824;backdrop-filter:none;-webkit-backdrop-filter:none}
+}
 
 /* Keep the compositor measurable while the glTF supplies the visible chassis. */
 .phone-model-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;z-index:2;visibility:hidden}
