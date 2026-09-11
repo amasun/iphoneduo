@@ -20,6 +20,7 @@ const wrapDegrees = (angle: number) => {
   return turn > 180 ? turn - 360 : turn < -180 ? turn + 360 : turn;
 };
 const DEFAULT_PERSPECTIVE_STRENGTH = 0.5;
+const DEFAULT_DIMMING_STRENGTH = 1;
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 const transpose = (m: number[]) => [m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]];
 const statusNames = { idle: '手动模拟', requesting: '等待授权', waiting: '等待体感', active: '体感已连接', denied: '未获授权', unavailable: '手动模拟', insecure: '需要 HTTPS', error: '连接未完成' };
@@ -64,6 +65,7 @@ export default function App() {
   const [calibration, setCalibration] = useState(initialCalibration);
   const [compensation, setCompensation] = useState(DEFAULT_COMPENSATION);
   const [perspectiveStrength, setPerspectiveStrength] = useState(DEFAULT_PERSPECTIVE_STRENGTH);
+  const [desktopDimming, setDesktopDimming] = useState(DEFAULT_DIMMING_STRENGTH);
   const [yaw, setYaw] = useState(0);
   const [modelPitch, setModelPitch] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -88,8 +90,10 @@ export default function App() {
   const lastTap = useRef<{ x: number; y: number; time: number; pointerType: string } | null>(null);
   const hideAfterConnection = useRef(false);
   const lastHinge = useRef<'left' | 'right'>('left');
-  const frameState = useRef({ settings, calibration, compensation, perspectiveStrength, yaw, modelPitch, playing, enabled, immersive, sensorActive: false, reducedMotion });
-  frameState.current = { settings, calibration, compensation, perspectiveStrength, yaw, modelPitch, playing, enabled, immersive, sensorActive: sensor.status === 'active' || sensor.status === 'waiting', reducedMotion };
+  const previewPerspective = mobilePreview ? perspectiveStrength : DEFAULT_PERSPECTIVE_STRENGTH;
+  const dimmingStrength = mobilePreview ? DEFAULT_DIMMING_STRENGTH : desktopDimming;
+  const frameState = useRef({ settings, calibration, compensation, perspectiveStrength: previewPerspective, dimmingStrength, yaw, modelPitch, playing, enabled, immersive, sensorActive: false, reducedMotion });
+  frameState.current = { settings, calibration, compensation, perspectiveStrength: previewPerspective, dimmingStrength, yaw, modelPitch, playing, enabled, immersive, sensorActive: sensor.status === 'active' || sensor.status === 'waiting', reducedMotion };
   useImmersiveViewport(immersive);
 
   useEffect(() => {
@@ -214,7 +218,8 @@ export default function App() {
       pose.current = s.sensorActive ? target : interpolateRotation(pose.current, target, s.reducedMotion ? 1 : 1 - Math.exp(-dt / 0.065));
       const angle = signedYawDegrees(pose.current);
       const effect = effectAtAngle(angle, s.settings);
-      const amount = s.enabled ? effect : { progress: 0, blur: 0, dim: 0 };
+      const amount = s.enabled ? { ...effect, dim: clamp(effect.dim * s.dimmingStrength, 0, 1) }
+        : { progress: 0, blur: 0, dim: 0 };
       // All previews use the same 1:1 counterrotation.
       const rotation = s.enabled ? pose.current : IDENTITY;
       const depth = 390 * Math.abs(Math.sin(signedYawDegrees(rotation) * Math.PI / 180));
@@ -415,15 +420,17 @@ export default function App() {
           {(isConnected || isBusy) && <button className="text-button" onClick={manual}>{t('切换到手动模拟')}</button>}
         </div>
 
-        <div className="section-label tuning-label"><h3>{t('微调空间')}</h3><button className="subtle-reset" onClick={() => { setSettings({ ...DEFAULT_EFFECT_SETTINGS }); setCompensation(DEFAULT_COMPENSATION); setPerspectiveStrength(DEFAULT_PERSPECTIVE_STRENGTH); setCalibration({ ...DEFAULT_CALIBRATION }); }} aria-label={t('重置效果参数')}><RotateCcw size={13} />{t('还原')}</button><button className="panel-close tuning-close" onClick={() => setPanelOpen(false)} aria-label={t('关闭参数面板')}><X size={18} /></button></div>
+        <div className="section-label tuning-label"><h3>{t('微调空间')}</h3><button className="subtle-reset" onClick={() => { setSettings({ ...DEFAULT_EFFECT_SETTINGS }); setCompensation(DEFAULT_COMPENSATION); setPerspectiveStrength(DEFAULT_PERSPECTIVE_STRENGTH); setDesktopDimming(DEFAULT_DIMMING_STRENGTH); setCalibration({ ...DEFAULT_CALIBRATION }); }} aria-label={t('重置效果参数')}><RotateCcw size={13} />{t('还原')}</button><button className="panel-close tuning-close" onClick={() => setPanelOpen(false)} aria-label={t('关闭参数面板')}><X size={18} /></button></div>
         <Range id="range-拉伸补偿" label={t('拉伸补偿')} value={compensation * 100} min={0} max={100} unit="%" onChange={v => setCompensation(v / 100)} />
-        <Range id="range-远侧收缩" label={t('远侧收缩')} value={perspectiveStrength * 100} min={0} max={200} unit="%" onChange={v => setPerspectiveStrength(v / 100)} />
+        {mobilePreview
+          ? <Range id="range-远侧收缩" label={t('远侧收缩')} value={perspectiveStrength * 100} min={0} max={200} unit="%" onChange={v => setPerspectiveStrength(v / 100)} />
+          : <Range id="range-远端压暗" label={t('远端压暗')} value={desktopDimming * 100} min={0} max={200} unit="%" onChange={v => setDesktopDimming(v / 100)} />}
         <Range id="range-开始失焦" label={t('开始失焦')} value={settings.threshold} min={0} max={28} unit="°" onChange={v => update('threshold', v)} />
         <Range id="range-透视距离" label={t('透视距离')} value={calibration.distanceCm} min={20} max={100} unit="cm" onChange={v => setCalibration(c => ({ ...c, distanceCm: v }))} />
         <Range id="range-失焦程度" label={t('失焦程度')} value={settings.blur} min={0} max={MAX_BLUR} unit="px" onChange={v => update('blur', v)} />
 
         <div className="effect-switch-row"><div><span>{t('空间效果')}</span></div><button role="switch" aria-checked={enabled} aria-label={t('空间效果开关')} className={`switch ${enabled ? 'on' : ''}`} onClick={() => setEnabled(v => !v)}><span /></button></div>
-        <details className="instructions"><summary>{t('使用说明')}<ChevronDown size={14} /></summary><p>{t('拖动模型可左右自由旋转，上下俯仰限 ±10°，点击「回到正面」复位。')}</p><p>{t('在 iPhone Safari 中启用体感并允许访问。正对屏幕校准后，保持头部不动，缓慢左右转动手机。双击画面显示或隐藏控件。')}</p><p>{t('拉伸补偿调节横向展开，远侧收缩调节近大远小。透视距离填写眼睛到屏幕的距离；失焦程度越高，模糊区域越暗。')}</p><p><strong>{t('iPhone 全屏体验')}</strong><br />{t('用 Safari 打开本页，点击「分享」→「添加到主屏幕」→「添加」。如出现「作为 Web App 打开」，请保持开启。随后回到手机桌面，点击新添加的 INSIDE 图标，即可在没有 Safari 地址栏和工具栏的界面中体验。进入后双击画面显示控件，再启用体感。')}</p></details>
+        <details className="instructions"><summary>{t('使用说明')}<ChevronDown size={14} /></summary><p>{t('拖动模型可左右自由旋转，上下俯仰限 ±10°，点击「回到正面」复位。')}</p><p>{t('在 iPhone Safari 中启用体感并允许访问。正对屏幕校准后，保持头部不动，缓慢左右转动手机。双击画面显示或隐藏控件。')}</p><p>{t(mobilePreview ? '拉伸补偿调节横向展开，远侧收缩调节近大远小。透视距离填写眼睛到屏幕的距离；失焦程度越高，模糊区域越暗。' : '拉伸补偿调节横向展开，透视距离填写眼睛到屏幕的距离。远端压暗控制模糊区域的明暗：0% 不压暗，100% 为原有强度，200% 加强压暗。它不改变图片透视或模糊程度；固定边缘保持明亮。')}</p><p><strong>{t('iPhone 全屏体验')}</strong><br />{t('用 Safari 打开本页，点击「分享」→「添加到主屏幕」→「添加」。如出现「作为 Web App 打开」，请保持开启。随后回到手机桌面，点击新添加的 INSIDE 图标，即可在没有 Safari 地址栏和工具栏的界面中体验。进入后双击画面显示控件，再启用体感。')}</p></details>
         {!immersive && <a className="iphone-preview-qr" href="https://amasun.github.io/iphoneduo/" target="_blank" rel="noreferrer" aria-label={t('打开 iPhone 预览，或使用相机扫描二维码')}>
           <img src={`${BASE_URL}iphone-preview.svg`} width={128} height={128} alt={t('iPhone 预览二维码')} />
           <div><strong>{t('iPhone 预览')}</strong><span>{t('相机扫码')}<br />{t('在 Safari 中打开')}</span></div>

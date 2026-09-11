@@ -38,6 +38,7 @@ const ENGLISH_TRANSLATIONS: Readonly<Record<string, string>> = {
 
   '拉伸补偿': 'Stretch correction',
   '远侧收缩': 'Perspective',
+  '远端压暗': 'Edge dimming',
   '开始失焦': 'Blur onset',
   '透视距离': 'View distance',
   '失焦程度': 'Blur',
@@ -47,6 +48,7 @@ const ENGLISH_TRANSLATIONS: Readonly<Record<string, string>> = {
   '拖动模型可左右自由旋转，上下俯仰限 ±10°，点击「回到正面」复位。': 'Drag the model to rotate freely left and right. Pitch is limited to ±10°. Click “Reset to front” to reset.',
   '在 iPhone Safari 中启用体感并允许访问。正对屏幕校准后，保持头部不动，缓慢左右转动手机。双击画面显示或隐藏控件。': 'Enable motion sensing in iPhone Safari and allow access. Calibrate while facing the screen, keep your head still, and slowly turn the phone left or right. Double-tap the screen to show or hide controls.',
   '拉伸补偿调节横向展开，远侧收缩调节近大远小。透视距离填写眼睛到屏幕的距离；失焦程度越高，模糊区域越暗。': 'Stretch correction controls horizontal expansion; Perspective controls near-far scaling. Enter the distance from your eyes to the screen under View distance; higher Blur makes blurred areas darker.',
+  '拉伸补偿调节横向展开，透视距离填写眼睛到屏幕的距离。远端压暗控制模糊区域的明暗：0% 不压暗，100% 为原有强度，200% 加强压暗。它不改变图片透视或模糊程度；固定边缘保持明亮。': 'Stretch correction controls horizontal expansion. Set View distance to the distance from your eyes to the screen. Edge dimming controls the darkness of blurred areas: 0% disables it, 100% keeps the original strength, and 200% increases it. Perspective and blur stay the same; the hinged edge stays bright.',
   'iPhone 全屏体验': 'Full-screen iPhone experience',
   '用 Safari 打开本页，点击「分享」→「添加到主屏幕」→「添加」。如出现「作为 Web App 打开」，请保持开启。随后回到手机桌面，点击新添加的 INSIDE 图标，即可在没有 Safari 地址栏和工具栏的界面中体验。进入后双击画面显示控件，再启用体感。': 'Open this page in Safari, tap “Share” → “Add to Home Screen” → “Add”. If “Open as Web App” appears, leave it enabled. Return to the Home Screen and tap the new INSIDE icon to use the experience without Safari’s address or toolbar. Double-tap the screen to show controls, then enable motion sensing.',
   '打开 iPhone 预览，或使用相机扫描二维码': 'Open the iPhone preview, or scan the QR code with your camera',

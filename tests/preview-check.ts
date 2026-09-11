@@ -4,6 +4,8 @@ interface SceneDraw {
   rotation: number[];
   camera: Vec3;
   perspectiveStrength: number;
+  blur: number;
+  dim: number;
 }
 
 interface ContextCapture {
@@ -295,11 +297,24 @@ export async function runPreviewChecks() {
     };
     prototype.drawArrays = function (this: WebGL2RenderingContext, ...args: any[]) {
       const state = contextState(this);
+      const program = this.getParameter(this.CURRENT_PROGRAM) as WebGLProgram;
+      const axisLocation = this.getUniformLocation(program, 'u_axis');
+      if (axisLocation && Number(this.getUniform(program, axisLocation)) === 1
+        && state.draws.length > 0) {
+        // The vertical pass is the final blur pass. Its uniforms represent
+        // the pixels presented to the user, so attach them to the preceding
+        // scene draw without counting post-process passes as scene draws.
+        const draw = state.draws.at(-1)!;
+        const blurLocation = this.getUniformLocation(program, 'u_blur');
+        const dimLocation = this.getUniformLocation(program, 'u_dim');
+        draw.blur = blurLocation ? Number(this.getUniform(program, blurLocation)) : NaN;
+        draw.dim = dimLocation ? Number(this.getUniform(program, dimLocation)) : NaN;
+      }
       if (state.scenePending && state.rotation && state.camera) {
-        const program = this.getParameter(this.CURRENT_PROGRAM) as WebGLProgram;
         const location = this.getUniformLocation(program, 'u_perspectiveStrength');
         state.draws.push({ rotation: [...state.rotation], camera: [...state.camera],
-          perspectiveStrength: location ? this.getUniform(program, location) as number : NaN });
+          perspectiveStrength: location ? this.getUniform(program, location) as number : NaN,
+          blur: NaN, dim: NaN });
         state.scenePending = false;
       }
       return originalDrawArrays!.apply(this, args);
@@ -334,12 +349,12 @@ export async function runPreviewChecks() {
 
     const yawInput = frameDocument.querySelector<HTMLInputElement>('#range-左右倾斜');
     const compensationInput = frameDocument.querySelector<HTMLInputElement>('#range-拉伸补偿');
-    const perspectiveInput = frameDocument.querySelector<HTMLInputElement>('#range-远侧收缩');
+    const desktopDimmingInput = frameDocument.querySelector<HTMLInputElement>('#range-远端压暗');
     const distanceInput = frameDocument.querySelector<HTMLInputElement>('#range-透视距离');
     const screenShortCm = 6.51;
     const stage = frameDocument.querySelector<HTMLElement>('.stage');
     const device = frameDocument.querySelector<HTMLElement>('.device');
-    if (!yawInput || !compensationInput || !perspectiveInput || !distanceInput || !stage || !device) {
+    if (!yawInput || !compensationInput || !desktopDimmingInput || !distanceInput || !stage || !device) {
       throw new Error('Preview App controls are incomplete');
     }
     if (yawInput.min !== '-180' || yawInput.max !== '180') {
@@ -357,32 +372,44 @@ export async function runPreviewChecks() {
     }
 
     const framedCompensation = Number(compensationInput.value) / 100;
-    // Image loading can draw once before the App's first animation frame
-    // applies its configured defaults to the renderer.
+    // Desktop keeps the original perspective strength on the GPU while its
+    // exposed control adjusts only the far-side attenuation.
     await waitFor(() => Math.abs(state.draws.at(-1)!.perspectiveStrength - 0.5) < 0.0001,
       'Far-side perspective did not initialize to 50% on the GPU');
-    if (perspectiveInput.min !== '0' || perspectiveInput.max !== '200' || perspectiveInput.value !== '50'
+    if (desktopDimmingInput.min !== '0' || desktopDimmingInput.max !== '200'
+      || desktopDimmingInput.value !== '100'
+      || frameDocument.querySelector('#range-远侧收缩')
       || Math.abs(state.draws.at(-1)!.perspectiveStrength - 0.5) > 0.0001) {
-      throw new Error('Far-side perspective did not initialize to 50% on the GPU');
+      throw new Error('Desktop far-side dimming did not initialize to 0..200/100 with fixed perspective');
     }
-    const perspectiveResults: Record<string, unknown>[] = [];
-    const checkPerspectiveControl = async (mode: string) => {
+    const dimmingResults: Record<string, unknown>[] = [];
+    const checkDesktopDimmingControl = async (mode: string) => {
       const settledPlane = mode === 'sensor' ? IDENTITY : rotationY(-Number(yawInput.value));
       await waitFor(() => maxDifference(state.draws.at(-1)!.rotation, settledPlane) < 0.00002,
-        `${mode}: plane easing did not settle before the perspective sweep`);
+        `${mode}: plane easing did not settle before the dimming sweep`);
       const baseline = state.draws.at(-1)!;
-      for (const value of [0, 100, 200, 50]) {
+      await waitFor(() => Number.isFinite(state.draws.at(-1)!.dim)
+        && Number.isFinite(state.draws.at(-1)!.blur),
+      `${mode}: blur pass did not expose dimming uniforms`);
+      const baseDim = baseline.dim;
+      for (const value of [0, 100, 200, 100]) {
         const before = state.draws.length;
-        setRangeValue(frameWindow, perspectiveInput, value);
+        setRangeValue(frameWindow, desktopDimmingInput, value);
         await waitFor(() => state.draws.length > before
-          && Math.abs(state.draws.at(-1)!.perspectiveStrength - value / 100) < 0.0001,
-        `${mode}: far-side slider ${value}% did not redraw the GPU`);
+          && Number.isFinite(state.draws.at(-1)!.dim)
+          && Number.isFinite(state.draws.at(-1)!.blur),
+        `${mode}: far-side dimming slider ${value}% did not redraw the GPU`);
         const draw = state.draws.at(-1)!;
+        const expectedDim = clamp(baseDim * value / 100, 0, 1);
         if (maxDifference(draw.rotation, baseline.rotation) > 0.003
-          || maxDifference(draw.camera, baseline.camera) > 3) {
-          throw new Error(`${mode}: far-side slider changed the plane angle or calibrated eye`);
+          || maxDifference(draw.camera, baseline.camera) > 3
+          || Math.abs(draw.perspectiveStrength - baseline.perspectiveStrength) > 0.0001
+          || Math.abs(draw.blur - baseline.blur) > 0.0001
+          || Math.abs(draw.dim - expectedDim) > 0.0001) {
+          throw new Error(`${mode}: far-side dimming changed geometry/blur or produced ${draw.dim} (expected ${expectedDim})`);
         }
-        perspectiveResults.push({ mode, value, actual: draw.perspectiveStrength });
+        dimmingResults.push({ mode, value, actual: draw.dim, expected: expectedDim,
+          perspectiveStrength: draw.perspectiveStrength, blur: draw.blur });
       }
     };
 
@@ -436,7 +463,20 @@ export async function runPreviewChecks() {
         expectedFramedPerspective, originError });
     }
 
-    await checkPerspectiveControl('framed');
+    await checkDesktopDimmingControl('framed');
+
+    // Verify the desktop reset independently before the fixture changes to a
+    // phone-sized viewport and React replaces the mode-specific range input.
+    const desktopResetButton = frameDocument.querySelector<HTMLButtonElement>('.subtle-reset');
+    if (!desktopResetButton) throw new Error('Missing desktop effect reset button');
+    setRangeValue(frameWindow, desktopDimmingInput, 170);
+    await waitFor(() => desktopDimmingInput.value === '170'
+      && Number.isFinite(state.draws.at(-1)!.dim),
+    'Desktop far-side dimming slider did not accept a custom value before reset');
+    desktopResetButton.click();
+    await waitFor(() => desktopDimmingInput.value === '100'
+      && Math.abs(state.draws.at(-1)!.perspectiveStrength - 0.5) < 0.0001,
+    'Desktop effect reset did not restore 100% far-side dimming and fixed perspective');
 
     // Horizontal laps remain unrestricted, including at either pitch limit.
     const frontButton = frameDocument.querySelector<HTMLButtonElement>('.simulation-bottom button')!;
@@ -467,6 +507,22 @@ export async function runPreviewChecks() {
       stage.setPointerCapture = oldCapture;
     }
 
+    // Leave the desktop-only control at 200% while switching to the phone
+    // viewport. Mobile must immediately use its original dimming formula,
+    // independent of the last desktop-only setting.
+    setRangeValue(frameWindow, yawInput, -55);
+    await waitFor(() => maxDifference(state.draws.at(-1)!.rotation, rotationY(55)) < 0.0002,
+      'Desktop/mobile dimming isolation pose did not settle');
+    setRangeValue(frameWindow, desktopDimmingInput, 100);
+    await waitFor(() => Number.isFinite(state.draws.at(-1)!.dim),
+      'Desktop/mobile dimming isolation baseline did not render');
+    const desktopIsolationBaseDim = state.draws.at(-1)!.dim;
+    setRangeValue(frameWindow, desktopDimmingInput, 200);
+    await waitFor(() => Number.isFinite(state.draws.at(-1)!.dim)
+      && Math.abs(state.draws.at(-1)!.dim - clamp(desktopIsolationBaseDim * 2, 0, 1)) < 0.0001,
+    'Desktop 200% far-side dimming did not reach the GPU');
+    const desktopIsolationDoubleDim = state.draws.at(-1)!.dim;
+
     // Switch the same fresh App to immersive mode, then exercise the actual
     // permission and DeviceOrientation event path. The first reading is the
     // calibration pose; subsequent readings are checked independently from
@@ -486,6 +542,25 @@ export async function runPreviewChecks() {
     await waitFor(() => canvas.clientWidth >= 380 && canvas.clientWidth <= 400
       && canvas.clientHeight >= 830 && canvas.clientHeight <= 860,
     'Preview App did not settle to the phone-sized canvas');
+    // The responsive render replaces the desktop dimming range with the
+    // mobile perspective range. Query it only after the viewport transition;
+    // retaining the old desktop element would test a detached DOM node.
+    let mobilePerspectiveInput: HTMLInputElement | null = null;
+    await waitFor(() => {
+      mobilePerspectiveInput = frameDocument.querySelector<HTMLInputElement>('#range-远侧收缩');
+      return Boolean(mobilePerspectiveInput)
+        && !frameDocument.querySelector('#range-远端压暗');
+    }, 'Mobile preview did not expose the far-side perspective range');
+    await waitFor(() => Number.isFinite(state.draws.at(-1)!.dim)
+      && Math.abs(state.draws.at(-1)!.dim - desktopIsolationBaseDim) < 0.0001,
+    'Mobile preview inherited the desktop-only 200% far-side dimming');
+    const mobileIsolationDim = state.draws.at(-1)!.dim;
+    if (!mobilePerspectiveInput
+      || mobilePerspectiveInput.min !== '0'
+      || mobilePerspectiveInput.max !== '200'
+      || mobilePerspectiveInput.value !== '50') {
+      throw new Error('Mobile far-side perspective did not initialize to 0..200/50');
+    }
     const expectedDistance = Number(distanceInput.value) / screenShortCm
       * Math.min(canvas.clientWidth, canvas.clientHeight);
 
@@ -524,7 +599,33 @@ export async function runPreviewChecks() {
         planeError, cameraError, expectedDistance });
     }
 
-    await checkPerspectiveControl('immersive');
+    const perspectiveResults: Record<string, unknown>[] = [];
+    const checkMobilePerspectiveControl = async (mode: string, input: HTMLInputElement) => {
+      const settledPlane = mode === 'sensor' ? IDENTITY : rotationY(-Number(yawInput.value));
+      await waitFor(() => maxDifference(state.draws.at(-1)!.rotation, settledPlane) < 0.00002,
+        `${mode}: plane easing did not settle before the perspective sweep`);
+      const baseline = state.draws.at(-1)!;
+      for (const value of [0, 100, 200, 50]) {
+        const before = state.draws.length;
+        setRangeValue(frameWindow, input, value);
+        await waitFor(() => state.draws.length > before
+          && Math.abs(state.draws.at(-1)!.perspectiveStrength - value / 100) < 0.0001,
+        `${mode}: far-side perspective slider ${value}% did not redraw the GPU`);
+        const draw = state.draws.at(-1)!;
+        const blurChanged = Number.isFinite(baseline.blur) && Number.isFinite(draw.blur)
+          && Math.abs(draw.blur - baseline.blur) > 0.0001;
+        const dimChanged = Number.isFinite(baseline.dim) && Number.isFinite(draw.dim)
+          && Math.abs(draw.dim - baseline.dim) > 0.0001;
+        if (maxDifference(draw.rotation, baseline.rotation) > 0.003
+          || maxDifference(draw.camera, baseline.camera) > 3
+          || blurChanged || dimChanged) {
+          throw new Error(`${mode}: far-side perspective changed the plane, calibrated eye, blur or dimming`);
+        }
+        perspectiveResults.push({ mode, value, actual: draw.perspectiveStrength });
+      }
+    };
+
+    await checkMobilePerspectiveControl('immersive', mobilePerspectiveInput);
 
     // Keep one manual pose to compare with the identical calibrated sensor
     // pose below. Alpha +35° produces the same -35° horizontal plane yaw.
@@ -538,6 +639,8 @@ export async function runPreviewChecks() {
       rotation: [...state.draws[state.draws.length - 1].rotation],
       camera: [...state.draws[state.draws.length - 1].camera],
       perspectiveStrength: state.draws.at(-1)!.perspectiveStrength,
+      blur: state.draws.at(-1)!.blur,
+      dim: state.draws.at(-1)!.dim,
     };
 
     const mockDeviceOrientationEvent = function MockDeviceOrientationEvent() {};
@@ -858,8 +961,8 @@ export async function runPreviewChecks() {
 
     const resetButton = frameDocument.querySelector<HTMLButtonElement>('.subtle-reset');
     if (!resetButton) throw new Error('Missing effect reset button');
-    await checkPerspectiveControl('sensor');
-    setRangeValue(frameWindow, perspectiveInput, 170);
+    await checkMobilePerspectiveControl('sensor', mobilePerspectiveInput);
+    setRangeValue(frameWindow, mobilePerspectiveInput, 170);
     await waitFor(() => Math.abs(state.draws.at(-1)!.perspectiveStrength - 1.7) < 0.0001,
       'Far-side slider did not accept a custom value before reset');
     setRangeValue(frameWindow, compensationInput, 50);
@@ -867,12 +970,16 @@ export async function runPreviewChecks() {
       'Stretch compensation slider did not accept 50% before reset');
     resetButton.click();
     await waitFor(() => compensationInput.value === '60' && distanceInput.value === '40'
-      && perspectiveInput.value === '50' && Math.abs(state.draws.at(-1)!.perspectiveStrength - 0.5) < 0.0001,
-      'Effect reset did not restore 60% compensation, 40cm distance and 50% far-side perspective');
+      && mobilePerspectiveInput.value === '50'
+      && Math.abs(state.draws.at(-1)!.perspectiveStrength - 0.5) < 0.0001,
+      'Effect reset did not restore 60% compensation, 40cm distance and 50% mobile far-side perspective');
 
     return { framed: results, orbit: orbitResults, immersiveManual: immersiveManualResults,
       sensor: sensorResults, pitchInvariant: pitchInvariantResults,
-      stretch: stretchResults, calibration: calibrationResults, perspective: perspectiveResults,
+      stretch: stretchResults, calibration: calibrationResults, dimming: dimmingResults,
+      perspective: perspectiveResults,
+      dimmingIsolation: { desktopAt100: desktopIsolationBaseDim,
+        desktopAt200: desktopIsolationDoubleDim, mobile: mobileIsolationDim },
       highAngle: highAngleResults, resetCompensation: Number(compensationInput.value),
       neutralCamera: neutralDraw.camera, neutralPlaneError };
   } finally {
