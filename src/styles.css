@@ -275,3 +275,36 @@ body.immersive-viewport-active #root{position:relative;z-index:0;width:100%;heig
 
 .model-attribution{display:flex;flex-wrap:wrap;gap:4px 6px;padding-top:10px;margin-top:10px;border-top:1px solid var(--panel-line);font-size:10px;line-height:1.7;color:var(--panel-muted)}
 .model-attribution a{text-decoration:underline;text-underline-offset:3px}
+
+/* Neutral light glass for the desktop controls. */
+.app:not(.is-immersive){--glass-bg:rgba(235,235,235,.92);--glass-border:#00000018;--glass-shadow:inset 0 1px 0 #ffffffb3,0 10px 28px #0000000d}
+.app:not(.is-immersive) :is(.controls,.simulation-panel){--panel-bg:var(--glass-bg);--panel-line:#d2d2d2;--panel-muted:#606060;--panel-accent:#555;--panel-track:#858585;color-scheme:light;color:#252525}
+.app:not(.is-immersive) :is(.controls,.simulation-panel) .range-label label{color:#505050}
+.app:not(.is-immersive) :is(.controls,.simulation-panel) .range-label output{color:#252525}
+.app:not(.is-immersive) :is(.controls,.simulation-panel) input[type=range]::-webkit-slider-runnable-track{background:linear-gradient(to right,var(--panel-accent) var(--range-fill),var(--panel-track) var(--range-fill))}
+.app:not(.is-immersive) :is(.controls,.simulation-panel) input[type=range]::-webkit-slider-thumb{box-shadow:0 0 0 1px #888,0 1px 3px #0002}
+.app:not(.is-immersive) :is(.controls,.simulation-panel) input[type=range]::-moz-range-track{background:var(--panel-track)}
+.app:not(.is-immersive) :is(.controls,.simulation-panel) input[type=range]::-moz-range-thumb{box-shadow:0 0 0 1px #888,0 1px 3px #0002}
+.app:not(.is-immersive) .controls .primary-button{background:#484848;color:#fff;border-color:#484848}
+.app:not(.is-immersive) .controls .primary-button:hover{background:#333}
+.app:not(.is-immersive) .controls :is(.subtle-reset,.effect-switch-row>div){color:#505050}
+.app:not(.is-immersive) .controls .sensor-message.attention{color:#874b16}
+.app:not(.is-immersive) .controls .switch:before{background:#b8b8b8}
+.app:not(.is-immersive) .controls .switch.on:before{background:#555}
+.app:not(.is-immersive) .controls .switch>span{background:#fff}
+.app:not(.is-immersive) :is(.controls .tuning-close,.demo-button,.simulation-bottom button){background:#dedede;color:#444}
+.app:not(.is-immersive) :is(.controls .tuning-close,.demo-button,.simulation-bottom button):hover{background:#d2d2d2;color:#252525}
+.app:not(.is-immersive) .iphone-preview-qr{color:#333}
+.app:not(.is-immersive) .render-notice{color:#444}
+.app:not(.is-immersive) .preview-footer button{background:var(--glass-bg);color:#444;border-color:#d2d2d2}
+.app:not(.is-immersive) .preview-footer button[aria-expanded=true]{background:#dcdcdc;border-color:#bdbdbd}
+.app:not(.is-immersive) .preview-footer button:hover{background:#dedede;color:#252525}
+.app:not(.is-immersive) .language-switch{color:#444;background:#ebebeb;border-color:#d2d2d2}
+.app:not(.is-immersive) .language-switch:hover{background:#dedede}
+.app:not(.is-immersive) :is(.language-switch,.preview-footer button):focus-visible{outline:2px solid #555;outline-offset:3px}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .app:not(.is-immersive) :is(.controls,.simulation-panel,.preview-footer button){background:#ebebeb}
+}
+@media(prefers-reduced-transparency:reduce){
+  .app:not(.is-immersive) :is(.controls,.simulation-panel,.preview-footer button){background:#ebebeb;backdrop-filter:none;-webkit-backdrop-filter:none}
+}
