@@ -85,3 +85,35 @@ body.immersive-viewport-active #root{position:relative;z-index:0;width:100%;heig
 .is-immersive .controls .range-label output{grid-column:3;grid-row:1;text-align:right;font-size:12px;white-space:nowrap}
 .is-immersive .controls .range-label output span{margin-left:2px}
 .is-immersive .controls input[type=range]{grid-column:2;grid-row:1;height:44px;margin:0;min-width:0}
+
+/* Shared dark surfaces for settings, manual controls and sensor setup. */
+.controls,.simulation-panel,.intro-card{
+  --panel-bg:#191d23;--panel-line:#3d4652;--panel-muted:#b6c0cc;--panel-accent:#b8d5a1;
+  color-scheme:dark;color:#f0f3f7;background:var(--panel-bg);border-color:var(--panel-line);
+}
+.app:not(.is-immersive) .controls{padding:20px;border:1px solid var(--panel-line);border-radius:18px;align-self:start}
+.is-immersive .controls.panel-open,.is-immersive .intro-card{background:rgba(25,29,35,.97);box-shadow:inset 0 0 0 1px #ffffff14,0 8px 28px #0005}
+:is(.controls,.simulation-panel,.intro-card) :is(.eyebrow,.lead,.field-hint,.geometry-note,.instructions,.hinge-status,.sensor-message,.connection-title div>span,.readouts>div>span,.readouts small,.simulation-bottom),
+.intro-card p,.intro-card .intro-manual{color:var(--panel-muted)}
+:is(.controls,.simulation-panel) .range-label label{color:#d1d8e1}
+:is(.controls,.simulation-panel) .range-label output{color:#f0f3f7}
+:is(.controls,.simulation-panel) .range-label output span{color:var(--panel-muted)}
+:is(.controls,.simulation-panel) input[type=range]::-webkit-slider-runnable-track{background:linear-gradient(to right,var(--panel-accent) var(--range-fill),#586575 var(--range-fill))}
+:is(.controls,.simulation-panel) input[type=range]::-webkit-slider-thumb{background:#eff6e8;border-color:var(--panel-accent);box-shadow:0 0 0 2px var(--panel-bg)}
+:is(.controls,.simulation-panel) input[type=range]::-moz-range-track{background:#586575}
+:is(.controls,.simulation-panel) input[type=range]::-moz-range-progress{background:var(--panel-accent)}
+:is(.controls,.simulation-panel) input[type=range]::-moz-range-thumb{background:#eff6e8;border-color:var(--panel-accent)}
+.controls .connection-card{background:#232a33;border-color:var(--panel-line)}
+.controls .connection-icon{background:#303b32;border-color:#53654b;color:var(--panel-accent)}
+.controls .sensor-message.attention{color:#ffd09a}
+:is(.controls,.simulation-panel,.intro-card) :is(.primary-button,.demo-button){background:var(--panel-accent);color:#1c2916;border-color:var(--panel-accent)}
+:is(.controls,.intro-card) .primary-button>span{color:#354a2b}
+:is(.controls,.simulation-panel,.intro-card) :is(.primary-button,.demo-button):hover{background:#a4c68a}
+:is(.controls,.simulation-panel) :is(.subtle-reset,.hinge-status button,.simulation-bottom button){color:#cfdec3}
+:is(.controls,.simulation-panel) :is(.effect-switch-row,.manual-controls,.readouts,.simulation-bottom){border-color:var(--panel-line)}
+.controls .effect-switch-row>div{color:#d1d8e1}
+.controls .switch:before{background:#586575}
+.controls .switch.on:before{background:var(--panel-accent)}
+.controls .switch.on>span{background:#24301e}
+:is(.controls,.simulation-panel,.intro-card) :is(button,a,input,summary):focus-visible{outline-color:var(--panel-accent)}
+.controls :is(.subtle-reset,.panel-close):hover{color:#fff;background:#ffffff0d;border-radius:6px}
