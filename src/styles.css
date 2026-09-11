@@ -51,3 +51,37 @@ body.immersive-viewport-active #root{position:relative;z-index:0;width:100%;heig
 .viewing-calibration p{font-size:11px;line-height:1.8;color:#6f7864;margin:12px 0}
 .viewing-calibration .text-button{display:flex;align-items:center;gap:7px;font-size:12px;min-height:36px}
 .viewing-calibration .calibration-save-note{font-size:10px;margin-bottom:0}
+
+/* Keep immersive tuning beside its trigger, with the scene visible around it. */
+.is-immersive .controls.panel-open{
+  top:calc(var(--immersive-viewport-top,0px) + env(safe-area-inset-top,0px) + 75px);
+  right:calc(100% - var(--immersive-viewport-right,100%) + max(12px,env(safe-area-inset-right,0px)));
+  bottom:auto;left:auto;width:304px;height:auto;
+  max-width:calc(var(--immersive-viewport-width,100vw) - 24px);
+  max-height:calc(var(--immersive-viewport-height,100vh) - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 90px);
+  padding:8px 12px 12px;border-radius:16px;
+  box-shadow:0 8px 28px #0003;
+}
+.is-immersive .panel-backdrop{background:transparent}
+.is-immersive .controls>.controls-heading,
+.is-immersive .controls>.lead,
+.is-immersive .controls>.connection-card,
+.is-immersive .controls>.geometry-note,
+.is-immersive .controls>.effect-switch-row,
+.is-immersive .controls>.hinge-status,
+.is-immersive .controls>.instructions,
+.is-immersive .controls .field-hint,
+.is-immersive .viewing-calibration>summary,
+.is-immersive .viewing-calibration>p,
+.is-immersive .viewing-calibration>.text-button{display:none}
+.is-immersive .controls .tuning-label{margin:0 0 4px;min-height:44px;gap:6px}
+.is-immersive .controls .tuning-label h3{font-size:13px}
+.is-immersive .controls .subtle-reset{font-size:11px;min-width:44px;min-height:44px;padding:0 4px}
+.is-immersive .controls .tuning-close{display:flex;min-width:44px;min-height:44px;padding:0;margin:0}
+.is-immersive .controls .range-field{display:grid;grid-template-columns:60px minmax(0,1fr) 47px;gap:8px;align-items:center;min-height:44px;margin:0}
+.is-immersive .controls .range-label{display:contents}
+.is-immersive .controls .range-label label{grid-column:1;grid-row:1;font-size:12px}
+.is-immersive .controls .range-label output{grid-column:3;grid-row:1;text-align:right;font-size:12px;white-space:nowrap}
+.is-immersive .controls .range-label output span{margin-left:2px}
+.is-immersive .controls input[type=range]{grid-column:2;grid-row:1;height:44px;margin:0;min-width:0}
+.is-immersive .controls .viewing-calibration{border:0;border-radius:0;background:none;padding:0;margin:0}

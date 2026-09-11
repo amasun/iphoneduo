@@ -305,12 +305,12 @@ export default function App() {
           {(isConnected || isBusy) && <button className="text-button" onClick={manual}>切换到手动模拟</button>}
         </div>
 
-        <div className="section-label tuning-label"><h3>微调空间</h3><button className="subtle-reset" onClick={() => { setSettings({ ...DEFAULT_EFFECT_SETTINGS }); setCompensation(DEFAULT_COMPENSATION); setCalibration({ ...DEFAULT_CALIBRATION }); }} aria-label="重置效果参数"><RotateCcw size={13} />还原</button></div>
+        <div className="section-label tuning-label"><h3>微调空间</h3><button className="subtle-reset" onClick={() => { setSettings({ ...DEFAULT_EFFECT_SETTINGS }); setCompensation(DEFAULT_COMPENSATION); setCalibration({ ...DEFAULT_CALIBRATION }); }} aria-label="重置效果参数"><RotateCcw size={13} />还原</button><button className="panel-close tuning-close" onClick={() => setPanelOpen(false)} aria-label="关闭参数面板"><X size={18} /></button></div>
         <p className="geometry-note">手动与体感均为 1:1 反向旋转 · 左右各 80°</p>
         <Range label="拉伸补偿" value={compensation * 100} min={0} max={100} unit="%" onChange={v => setCompensation(v / 100)} hint="100% 按实际左右角度补偿；降低可减轻横向展开。" />
         <Range label="开始失焦" value={settings.threshold} min={0} max={28} unit="°" onChange={v => update('threshold', v)} />
         <Range label="透视距离" value={calibration.distanceCm} min={20} max={100} unit="cm" onChange={v => setCalibration(c => ({ ...c, distanceCm: v }))} hint={`设为眼睛到屏幕中心的实际距离，默认 ${DEFAULT_CALIBRATION.distanceCm}cm。`} />
-        <details className="viewing-calibration">
+        <details className="viewing-calibration" open={immersive || undefined}>
           <summary>屏幕与观看校准<ChevronDown size={14} /></summary>
           <p>{Math.abs(calibration.screenShortCm - DEFAULT_CALIBRATION.screenShortCm) < 0.005 ? '当前按 iPhone 14 Pro 屏幕规格设置。' : '当前使用自定义屏幕尺寸。'}测量时只量发光区域，不含边框。</p>
           <Range label="屏幕短边" value={calibration.screenShortCm} min={5} max={10} step={0.01} unit="cm" onChange={v => setCalibration(c => ({ ...c, screenShortCm: v }))} />
