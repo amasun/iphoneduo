@@ -13,6 +13,7 @@ const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 const BASE_URL = import.meta.env.BASE_URL;
 const WALLPAPER_URL = `${BASE_URL}wallpaper.png`;
 const MAX_YAW = 80;
+const MAX_MODEL_PITCH = 10;
 const wrapDegrees = (angle: number) => {
   const turn = angle % 360;
   return turn > 180 ? turn - 360 : turn < -180 ? turn + 360 : turn;
@@ -213,8 +214,8 @@ export default function App() {
         s.immersive && (phoneBrowser || coarsePointer.matches),
       );
       const perspective = perspectiveDistancePx(shortEdge, s.calibration);
-      // Model inspection is a free orbit. Only the screen illusion retains
-      // its single-axis range; the chassis can turn over and complete laps.
+      // The chassis can complete horizontal laps, with a small pitch range.
+      // The screen illusion retains its separate single-axis range.
       const physicalTarget = s.immersive || s.sensorActive
         ? transpose(pose.current) : axisRotation(s.modelPitch, demoYaw);
       modelPose.current = s.immersive || s.sensorActive ? physicalTarget
@@ -319,7 +320,13 @@ export default function App() {
     setPlaying(false); setIntro(false);
     const nextYaw = drag.current.yaw + (event.clientX - drag.current.x) * (immersive ? 0.18 : 0.4);
     setYaw(immersive ? clamp(nextYaw, -MAX_YAW, MAX_YAW) : nextYaw);
-    if (!immersive) setModelPitch(drag.current.pitch + (event.clientY - drag.current.y) * 0.4);
+    if (!immersive) {
+      const nextPitch = clamp(drag.current.pitch + (event.clientY - drag.current.y) * 0.4, -MAX_MODEL_PITCH, MAX_MODEL_PITCH);
+      setModelPitch(nextPitch);
+      // Keep reversal responsive after the pointer moves beyond a pitch limit.
+      drag.current.pitch = nextPitch;
+      drag.current.y = event.clientY;
+    }
   };
   const cancelGesture = () => { drag.current = null; tap.current = null; lastTap.current = null; };
   const finishGesture = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -393,7 +400,7 @@ export default function App() {
         <Range label="失焦程度" value={settings.blur} min={0} max={MAX_BLUR} unit="px" onChange={v => update('blur', v)} />
 
         <div className="effect-switch-row"><div><span>空间效果</span></div><button role="switch" aria-checked={enabled} aria-label="空间效果开关" className={`switch ${enabled ? 'on' : ''}`} onClick={() => setEnabled(v => !v)}><span /></button></div>
-        <details className="instructions"><summary>使用说明<ChevronDown size={14} /></summary><p>拖动模型可上下左右自由旋转，点击「回到正面」复位。</p><p>在 iPhone Safari 中启用体感并允许访问。正对屏幕校准后，保持头部不动，缓慢左右转动手机。双击画面显示或隐藏控件。</p><p>拉伸补偿调节横向展开，远侧收缩调节近大远小。透视距离填写眼睛到屏幕的距离；失焦程度越高，模糊区域越暗。</p><p>通过 Safari 分享菜单「添加到主屏幕」可全屏体验。</p></details>
+        <details className="instructions"><summary>使用说明<ChevronDown size={14} /></summary><p>拖动模型可左右自由旋转，上下俯仰限 ±10°，点击「回到正面」复位。</p><p>在 iPhone Safari 中启用体感并允许访问。正对屏幕校准后，保持头部不动，缓慢左右转动手机。双击画面显示或隐藏控件。</p><p>拉伸补偿调节横向展开，远侧收缩调节近大远小。透视距离填写眼睛到屏幕的距离；失焦程度越高，模糊区域越暗。</p><p>通过 Safari 分享菜单「添加到主屏幕」可全屏体验。</p></details>
       </aside>
 
       <section className="simulation-panel" aria-label="手动模拟与实时读数">

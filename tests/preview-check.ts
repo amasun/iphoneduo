@@ -434,8 +434,7 @@ export async function runPreviewChecks() {
 
     await checkPerspectiveControl('framed');
 
-    // Exercise actual pointer gestures through multiple turns and over the
-    // poles. The chassis must keep moving after the screen effect saturates.
+    // Horizontal laps remain unrestricted, including at either pitch limit.
     const frontButton = frameDocument.querySelector<HTMLButtonElement>('.simulation-bottom button')!;
     const modelRotation = () => cssToYUp(parseTransform(frameWindow.getComputedStyle(device).transform));
     const orbitResults: Record<string, unknown>[] = [];
@@ -446,16 +445,16 @@ export async function runPreviewChecks() {
     stage.setPointerCapture = () => {};
     try {
       let yaw = 0, pitch = 0;
-      for (const [dx, dy] of [[300, 0], [300, 0], [300, 0], [300, 0], [-600, 0], [0, 450], [0, 300]]) {
+      for (const [dx, dy] of [[300, 0], [300, 0], [300, 0], [300, 0], [-600, 0], [0, 450], [300, 300], [0, -450], [-300, -300], [0, 15]]) {
         for (const [type, x, y] of [['pointerdown', 200, 250], ['pointermove', 200 + dx, 250 + dy], ['pointerup', 200 + dx, 250 + dy]] as const) {
           stage.dispatchEvent(new pointerRealm.PointerEvent(type, { bubbles: true, pointerId: 1,
             pointerType: 'mouse', isPrimary: true, button: 0, clientX: x, clientY: y }));
         }
         yaw += dx * 0.4;
-        pitch += dy * 0.4;
+        pitch = Math.max(-10, Math.min(10, pitch + dy * 0.4));
         const expected = multiply(rotationY(yaw), rotationX(pitch));
         await waitFor(() => maxDifference(modelRotation(), expected) < 0.0001,
-          `Model orbit clamped or failed at yaw ${yaw}, pitch ${pitch}`);
+          `Model orbit mismatch at yaw ${yaw}, pitch ${pitch}`);
         orbitResults.push({ yaw, pitch, error: maxDifference(modelRotation(), expected) });
       }
       frontButton.click();
