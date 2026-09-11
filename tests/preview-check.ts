@@ -346,8 +346,8 @@ export async function runPreviewChecks() {
       throw new Error(`Manual yaw range is not -80..80: ${yawInput.min}..${yawInput.max}`);
     }
     if (compensationInput.min !== '0' || compensationInput.max !== '100'
-      || compensationInput.value !== '80') {
-      throw new Error(`Stretch compensation range is not the default 0..100/80: ${compensationInput.min}..${compensationInput.max}/${compensationInput.value}`);
+      || compensationInput.value !== '60') {
+      throw new Error(`Stretch compensation range is not the default 0..100/60: ${compensationInput.min}..${compensationInput.max}/${compensationInput.value}`);
     }
     if (distanceInput.min !== '20' || distanceInput.max !== '100' || distanceInput.value !== '40') {
       throw new Error(`Viewing distance range is not the default 20..100/40: ${distanceInput.min}..${distanceInput.max}/${distanceInput.value}`);
@@ -833,9 +833,9 @@ export async function runPreviewChecks() {
     await waitFor(() => compensationInput.value === '50',
       'Stretch compensation slider did not accept 50% before reset');
     resetButton.click();
-    await waitFor(() => compensationInput.value === '80' && distanceInput.value === '40'
+    await waitFor(() => compensationInput.value === '60' && distanceInput.value === '40'
       && perspectiveInput.value === '50' && Math.abs(state.draws.at(-1)!.perspectiveStrength - 0.5) < 0.0001,
-      'Effect reset did not restore 80% compensation, 40cm distance and 50% far-side perspective');
+      'Effect reset did not restore 60% compensation, 40cm distance and 50% far-side perspective');
 
     return { framed: results, immersiveManual: immersiveManualResults,
       sensor: sensorResults, pitchInvariant: pitchInvariantResults,
