@@ -400,7 +400,7 @@ export default function App() {
         <Range label="失焦程度" value={settings.blur} min={0} max={MAX_BLUR} unit="px" onChange={v => update('blur', v)} />
 
         <div className="effect-switch-row"><div><span>空间效果</span></div><button role="switch" aria-checked={enabled} aria-label="空间效果开关" className={`switch ${enabled ? 'on' : ''}`} onClick={() => setEnabled(v => !v)}><span /></button></div>
-        <details className="instructions"><summary>使用说明<ChevronDown size={14} /></summary><p>拖动模型可左右自由旋转，上下俯仰限 ±10°，点击「回到正面」复位。</p><p>在 iPhone Safari 中启用体感并允许访问。正对屏幕校准后，保持头部不动，缓慢左右转动手机。双击画面显示或隐藏控件。</p><p>拉伸补偿调节横向展开，远侧收缩调节近大远小。透视距离填写眼睛到屏幕的距离；失焦程度越高，模糊区域越暗。</p><p>通过 Safari 分享菜单「添加到主屏幕」可全屏体验。</p></details>
+        <details className="instructions"><summary>使用说明<ChevronDown size={14} /></summary><p>拖动模型可左右自由旋转，上下俯仰限 ±10°，点击「回到正面」复位。</p><p>在 iPhone Safari 中启用体感并允许访问。正对屏幕校准后，保持头部不动，缓慢左右转动手机。双击画面显示或隐藏控件。</p><p>拉伸补偿调节横向展开，远侧收缩调节近大远小。透视距离填写眼睛到屏幕的距离；失焦程度越高，模糊区域越暗。</p><p><strong>iPhone 全屏体验</strong><br />用 Safari 打开本页，点击「分享」→「添加到主屏幕」→「添加」。如出现「作为 Web App 打开」，请保持开启。随后回到手机桌面，点击新添加的 INSIDE 图标，即可在没有 Safari 地址栏和工具栏的界面中体验。进入后双击画面显示控件，再启用体感。</p></details>
         {!immersive && <a className="iphone-preview-qr" href="https://amasun.github.io/iphoneduo/" target="_blank" rel="noreferrer" aria-label="打开 iPhone 预览，或使用相机扫描二维码">
           <img src={`${BASE_URL}iphone-preview.svg`} width={128} height={128} alt="iPhone 预览二维码" />
           <div><strong>iPhone 预览</strong><span>相机扫码<br />在 Safari 中打开</span></div>
