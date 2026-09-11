@@ -470,7 +470,7 @@ export async function runPreviewChecks() {
     await waitFor(() => frameDocument.querySelector('.sensor-message')?.textContent?.includes('体感已连接') === true,
       'Preview App did not accept the calibration orientation');
     const sensorResults: Record<string, unknown>[] = [];
-    const expectedDistance = 1950;
+    const expectedDistance = 50 / 7 * 390;
     let lastExpectedSignature: number[] | null = null;
     let lastDraw: SceneDraw | null = null;
     const sensorReadings: Array<[string, [number, number, number]]> = [
