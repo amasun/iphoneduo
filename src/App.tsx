@@ -13,6 +13,10 @@ const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 const BASE_URL = import.meta.env.BASE_URL;
 const WALLPAPER_URL = `${BASE_URL}wallpaper.png`;
 const MAX_YAW = 80;
+const wrapDegrees = (angle: number) => {
+  const turn = angle % 360;
+  return turn > 180 ? turn - 360 : turn < -180 ? turn + 360 : turn;
+};
 const DEFAULT_PERSPECTIVE_STRENGTH = 0.5;
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 const transpose = (m: number[]) => [m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]];
@@ -56,6 +60,7 @@ export default function App() {
   const [compensation, setCompensation] = useState(DEFAULT_COMPENSATION);
   const [perspectiveStrength, setPerspectiveStrength] = useState(DEFAULT_PERSPECTIVE_STRENGTH);
   const [yaw, setYaw] = useState(0);
+  const [modelPitch, setModelPitch] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [enabled, setEnabled] = useState(true);
   const [rendererError, setRendererError] = useState('');
@@ -72,14 +77,22 @@ export default function App() {
   const fallback = useRef<HTMLImageElement>(null);
   const engine = useRef<ReturnType<typeof createRenderer> | null>(null);
   const pose = useRef([...IDENTITY]);
-  const drag = useRef<{ id: number; x: number; yaw: number } | null>(null);
+  const modelPose = useRef([...IDENTITY]);
+  const drag = useRef<{ id: number; x: number; y: number; yaw: number; pitch: number } | null>(null);
   const tap = useRef<{ id: number; x: number; y: number; time: number; moved: boolean } | null>(null);
   const lastTap = useRef<{ x: number; y: number; time: number; pointerType: string } | null>(null);
   const hideAfterConnection = useRef(false);
   const lastHinge = useRef<'left' | 'right'>('left');
-  const frameState = useRef({ settings, calibration, compensation, perspectiveStrength, yaw, playing, enabled, immersive, sensorActive: false, reducedMotion });
-  frameState.current = { settings, calibration, compensation, perspectiveStrength, yaw, playing, enabled, immersive, sensorActive: sensor.status === 'active' || sensor.status === 'waiting', reducedMotion };
+  const frameState = useRef({ settings, calibration, compensation, perspectiveStrength, yaw, modelPitch, playing, enabled, immersive, sensorActive: false, reducedMotion });
+  frameState.current = { settings, calibration, compensation, perspectiveStrength, yaw, modelPitch, playing, enabled, immersive, sensorActive: sensor.status === 'active' || sensor.status === 'waiting', reducedMotion };
   useImmersiveViewport(immersive);
+
+  useEffect(() => {
+    if (immersive) {
+      setYaw(value => clamp(wrapDegrees(value), -MAX_YAW, MAX_YAW));
+      setModelPitch(0);
+    }
+  }, [immersive]);
 
   useEffect(() => {
     try {
@@ -177,7 +190,7 @@ export default function App() {
       const demoYaw = s.playing ? Math.sin(demoTime * 0.75) * 42 : s.yaw;
       // Use only horizontal phone heading for both the plane and its observer.
       // Pitch must not shift the camera or contaminate yaw during a side turn.
-      const horizontalYaw = s.sensorActive ? horizontalCorrectionDegrees(sensor.correction.current) : -demoYaw;
+      const horizontalYaw = s.sensorActive ? horizontalCorrectionDegrees(sensor.correction.current) : -(s.immersive ? demoYaw : wrapDegrees(demoYaw));
       const targetYaw = clamp(horizontalYaw, -MAX_YAW, MAX_YAW);
       const target = axisRotation(0, targetYaw);
       // Follow the sensor directly so the hinged plane does not lag the hand.
@@ -200,12 +213,18 @@ export default function App() {
         s.immersive && (phoneBrowser || coarsePointer.matches),
       );
       const perspective = perspectiveDistancePx(shortEdge, s.calibration);
-      const physicalRotation = pose.current;
+      // Model inspection is a free orbit. Only the screen illusion retains
+      // its single-axis range; the chassis can turn over and complete laps.
+      const physicalTarget = s.immersive || s.sensorActive
+        ? transpose(pose.current) : axisRotation(s.modelPitch, demoYaw);
+      modelPose.current = s.immersive || s.sensorActive ? physicalTarget
+        : interpolateRotation(modelPose.current, physicalTarget, s.reducedMotion ? 1 : 1 - Math.exp(-dt / 0.065));
+      const physicalRotation = modelPose.current;
       // At 100%, the observer follows the exact horizontal angle, including
       // turns above 45 degrees; pitch stays excluded from the whole scene.
       const viewerRotation = compensatedViewerRotation(angle, 0, s.compensation);
       const stageElement = device.current?.parentElement;
-      const signature = [...rotation, ...viewerRotation, amount.blur, amount.dim, scale, perspective, s.perspectiveStrength, Number(s.immersive), Number(hinge === 'right'), modelRevision.current,
+      const signature = [...rotation, ...viewerRotation, ...physicalRotation, amount.blur, amount.dim, scale, perspective, s.perspectiveStrength, Number(s.immersive), Number(hinge === 'right'), modelRevision.current,
         stageElement?.clientWidth ?? 0, stageElement?.clientHeight ?? 0, canvas.current?.clientHeight ?? 0,
         device.current?.offsetLeft ?? 0, device.current?.offsetTop ?? 0];
       if (signature.some((value, i) => Math.abs(value - (previousDraw[i] ?? Infinity)) > 0.00001)) {
@@ -223,7 +242,7 @@ export default function App() {
             element = parent;
           }
           phoneModel.current.setView({
-            rotation: transpose(physicalRotation), perspective,
+            rotation: physicalRotation, perspective,
             screenRect: { left, top, width: canvas.current.clientWidth, height: canvas.current.clientHeight },
           });
         }
@@ -236,7 +255,7 @@ export default function App() {
           stage.style.perspective = s.immersive ? 'none' : `${perspective}px`;
           stage.style.perspectiveOrigin = `${device.current.offsetLeft + device.current.offsetWidth / 2}px ${device.current.offsetTop + device.current.offsetHeight / 2}px`;
           device.current.style.transformOrigin = '50% 50%';
-          device.current.style.transform = s.immersive ? 'none' : matrixToCss3d(transpose(physicalRotation));
+          device.current.style.transform = s.immersive ? 'none' : matrixToCss3d(physicalRotation);
         }
         if (fallback.current) {
           fallback.current.style.transformOrigin = `${hinge} center`;
@@ -265,7 +284,7 @@ export default function App() {
   }, []);
 
   const reset = useCallback(() => {
-    setPlaying(false); setYaw(0);
+    setPlaying(false); setYaw(0); setModelPitch(0);
     if (sensor.status === 'active' || sensor.status === 'waiting') sensor.recalibrate();
   }, [sensor.status, sensor.recalibrate]);
   const manual = () => { sensor.disable(); setPlaying(false); setIntro(false); };
@@ -282,7 +301,10 @@ export default function App() {
     }
     if ((event.target as Element).closest('button, a, input') || event.button !== 0) return;
     tap.current = { id: event.pointerId, x: event.clientX, y: event.clientY, time: event.timeStamp, moved: false };
-    drag.current = frameState.current.sensorActive ? null : { id: event.pointerId, x: event.clientX, yaw };
+    if (!immersive && frameState.current.sensorActive) sensor.disable();
+    drag.current = immersive && frameState.current.sensorActive ? null
+      : { id: event.pointerId, x: event.clientX, y: event.clientY,
+          yaw: frameState.current.sensorActive ? -metrics.angle : yaw, pitch: modelPitch };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -295,7 +317,9 @@ export default function App() {
     if (!gesture.moved) return;
     if (!drag.current || event.pointerId !== drag.current.id) return;
     setPlaying(false); setIntro(false);
-    setYaw(clamp(drag.current.yaw + (event.clientX - drag.current.x) * 0.18, -MAX_YAW, MAX_YAW));
+    const nextYaw = drag.current.yaw + (event.clientX - drag.current.x) * (immersive ? 0.18 : 0.4);
+    setYaw(immersive ? clamp(nextYaw, -MAX_YAW, MAX_YAW) : nextYaw);
+    if (!immersive) setModelPitch(drag.current.pitch + (event.clientY - drag.current.y) * 0.4);
   };
   const cancelGesture = () => { drag.current = null; tap.current = null; lastTap.current = null; };
   const finishGesture = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -347,7 +371,7 @@ export default function App() {
             </div>
           </div>
           {!immersive && <canvas ref={modelCanvas} className="phone-model-canvas" role="img" aria-label="可旋转的 iPhone 17 Pro Max 三维模型，屏幕实时呈现倾斜效果" aria-hidden={!modelAspect} />}
-          <div className="stage-caption"><Hand size={15} /><span>拖动手机，探索不同角度</span><span className="caption-separator" /> <span>或使用下方角度滑杆</span></div>
+          <div className="stage-caption"><Hand size={15} /><span>上下左右拖动，360° 浏览手机</span><span className="caption-separator" /> <span>或使用下方角度滑杆</span></div>
         </div>
         <div className="preview-footer"><span><span className={`tiny-dot ${isConnected ? 'live' : ''}`} />{statusNames[sensor.status]}</span><button onClick={() => { setImmersive(true); setPanelOpen(false); setControlsVisible(!isMobilePreview()); }}><Expand size={15} />沉浸体验<ArrowUpRight size={14} /></button></div>
         {!immersive && <div className="model-credit"><a href="https://sketchfab.com/3d-models/iphone-17-pro-max-87fc1df741384124a8ce0226d2b2058d" target="_blank" rel="noreferrer">iPhone 17 Pro Max</a><span>·</span><a href="https://sketchfab.com/MG990" target="_blank" rel="noreferrer">MajdyModels</a><span>·</span><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a><span>· 实时屏幕改编</span></div>}
@@ -362,7 +386,7 @@ export default function App() {
 
       <aside id="controls" className={`controls ${panelOpen && (!immersive || controlsVisible) ? 'panel-open' : ''}`} aria-label="效果调节">
         <div className="controls-heading"><div><span className="eyebrow">THE EXPERIMENT</span><h2>感受空间的另一面<span>↗</span></h2></div><button className="panel-close icon-button" onClick={() => setPanelOpen(false)} aria-label="关闭调节面板"><X size={20} /></button></div>
-        <p className="lead">只响应左右倾斜，一侧边缘始终固定。<br />像翻开一扇门，让画面退入屏幕深处。</p>
+        <p className="lead">拖动查看完整机身，自由探索每个角度。<br />左右转动，让画面退入屏幕深处。</p>
 
         <div className="connection-card">
           <div className="connection-title"><span className="connection-icon"><Smartphone size={20} /></span><div><strong>用你的 iPhone 体验</strong><span>正对屏幕 · 允许体感 · 缓慢倾斜</span></div><span className={`connection-dot ${isConnected ? 'connected' : ''}`} /></div>
@@ -372,7 +396,7 @@ export default function App() {
         </div>
 
         <div className="section-label tuning-label"><h3>微调空间</h3><button className="subtle-reset" onClick={() => { setSettings({ ...DEFAULT_EFFECT_SETTINGS }); setCompensation(DEFAULT_COMPENSATION); setPerspectiveStrength(DEFAULT_PERSPECTIVE_STRENGTH); setCalibration({ ...DEFAULT_CALIBRATION }); }} aria-label="重置效果参数"><RotateCcw size={13} />还原</button><button className="panel-close tuning-close" onClick={() => setPanelOpen(false)} aria-label="关闭参数面板"><X size={18} /></button></div>
-        <p className="geometry-note">手动与体感均为 1:1 反向旋转 · 左右各 80°</p>
+        <p className="geometry-note">模型可自由旋转 · 以下参数调节屏幕内的空间效果</p>
         <Range label="拉伸补偿" value={compensation * 100} min={0} max={100} unit="%" onChange={v => setCompensation(v / 100)} hint="100% 按实际左右角度补偿；降低可减轻横向展开。" />
         <Range label="远侧收缩" value={perspectiveStrength * 100} min={0} max={200} unit="%" onChange={v => setPerspectiveStrength(v / 100)} hint="调低可减轻远侧变小；0% 无近远收缩，100% 为原透视。默认 50%。" />
         <Range label="开始失焦" value={settings.threshold} min={0} max={28} unit="°" onChange={v => update('threshold', v)} />
@@ -387,9 +411,9 @@ export default function App() {
       <section className="simulation-panel" aria-label="手动模拟与实时读数">
         <div className="simulation-heading"><div><span className="eyebrow">HANDS-ON PREVIEW</span><h2>让视角动起来</h2></div><button className="demo-button" onClick={activateDemo}>{playing ? <Pause size={15} /> : <Play size={15} />} {playing ? '暂停演示' : '播放演示'}</button></div>
         <div className="simulation-grid"><div className="manual-controls">
-          <Range label="左右倾斜" value={yaw} min={-MAX_YAW} max={MAX_YAW} unit="°" onChange={v => { manual(); setYaw(v); }} />
-        </div><div className="readouts"><div><span>左右倾角</span><strong>{Math.abs(metrics.angle).toFixed(1)}<small>°</small></strong></div><div><span>远侧深度</span><strong>{Math.round(metrics.depth)}<small>px</small></strong></div><div><span>最大失焦</span><strong>{metrics.blur.toFixed(1)}<small>px</small></strong></div></div></div>
-        <div className="simulation-bottom"><span><span className="tiny-dot" />{reducedMotion ? '已减少缓动 · 演示需手动播放' : `${metrics.hinge === 'left' ? '左' : '右'}边缘为转轴 · 前后倾斜不影响画面`}</span><button onClick={reset}><Crosshair size={14} />回到正面</button></div>
+          <Range label="左右倾斜" value={immersive ? yaw : wrapDegrees(yaw)} min={immersive ? -MAX_YAW : -180} max={immersive ? MAX_YAW : 180} unit="°" onChange={v => { manual(); setYaw(v); }} />
+        </div><div className="readouts"><div><span>左右倾角</span><strong>{Math.abs(immersive ? metrics.angle : wrapDegrees(yaw)).toFixed(1)}<small>°</small></strong></div><div><span>远侧深度</span><strong>{Math.round(metrics.depth)}<small>px</small></strong></div><div><span>最大失焦</span><strong>{metrics.blur.toFixed(1)}<small>px</small></strong></div></div></div>
+        <div className="simulation-bottom"><span><span className="tiny-dot" />{reducedMotion ? '已减少缓动 · 演示需手动播放' : '自由旋转 · 可查看背面、顶部与底部'}</span><button onClick={reset}><Crosshair size={14} />回到正面</button></div>
       </section>
     </main>
 

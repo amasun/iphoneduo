@@ -342,8 +342,8 @@ export async function runPreviewChecks() {
     if (!yawInput || !compensationInput || !perspectiveInput || !distanceInput || !stage || !device) {
       throw new Error('Preview App controls are incomplete');
     }
-    if (yawInput.min !== '-80' || yawInput.max !== '80') {
-      throw new Error(`Manual yaw range is not -80..80: ${yawInput.min}..${yawInput.max}`);
+    if (yawInput.min !== '-180' || yawInput.max !== '180') {
+      throw new Error(`Model yaw slider does not cover a full turn: ${yawInput.min}..${yawInput.max}`);
     }
     if (compensationInput.min !== '0' || compensationInput.max !== '100'
       || compensationInput.value !== '60') {
@@ -433,6 +433,36 @@ export async function runPreviewChecks() {
     }
 
     await checkPerspectiveControl('framed');
+
+    // Exercise actual pointer gestures through multiple turns and over the
+    // poles. The chassis must keep moving after the screen effect saturates.
+    const frontButton = frameDocument.querySelector<HTMLButtonElement>('.simulation-bottom button')!;
+    const modelRotation = () => cssToYUp(parseTransform(frameWindow.getComputedStyle(device).transform));
+    const orbitResults: Record<string, unknown>[] = [];
+    frontButton.click();
+    await waitFor(() => maxDifference(modelRotation(), IDENTITY) < 0.0001, 'Orbit reset failed');
+    const pointerRealm = frameWindow as Window & { PointerEvent: typeof PointerEvent };
+    const oldCapture = stage.setPointerCapture;
+    stage.setPointerCapture = () => {};
+    try {
+      let yaw = 0, pitch = 0;
+      for (const [dx, dy] of [[300, 0], [300, 0], [300, 0], [300, 0], [-600, 0], [0, 450], [0, 300]]) {
+        for (const [type, x, y] of [['pointerdown', 200, 250], ['pointermove', 200 + dx, 250 + dy], ['pointerup', 200 + dx, 250 + dy]] as const) {
+          stage.dispatchEvent(new pointerRealm.PointerEvent(type, { bubbles: true, pointerId: 1,
+            pointerType: 'mouse', isPrimary: true, button: 0, clientX: x, clientY: y }));
+        }
+        yaw += dx * 0.4;
+        pitch += dy * 0.4;
+        const expected = multiply(rotationY(yaw), rotationX(pitch));
+        await waitFor(() => maxDifference(modelRotation(), expected) < 0.0001,
+          `Model orbit clamped or failed at yaw ${yaw}, pitch ${pitch}`);
+        orbitResults.push({ yaw, pitch, error: maxDifference(modelRotation(), expected) });
+      }
+      frontButton.click();
+      await waitFor(() => maxDifference(modelRotation(), IDENTITY) < 0.0001, 'Orbit did not reset both axes');
+    } finally {
+      stage.setPointerCapture = oldCapture;
+    }
 
     // Switch the same fresh App to immersive mode, then exercise the actual
     // permission and DeviceOrientation event path. The first reading is the
@@ -837,7 +867,7 @@ export async function runPreviewChecks() {
       && perspectiveInput.value === '50' && Math.abs(state.draws.at(-1)!.perspectiveStrength - 0.5) < 0.0001,
       'Effect reset did not restore 60% compensation, 40cm distance and 50% far-side perspective');
 
-    return { framed: results, immersiveManual: immersiveManualResults,
+    return { framed: results, orbit: orbitResults, immersiveManual: immersiveManualResults,
       sensor: sensorResults, pitchInvariant: pitchInvariantResults,
       stretch: stretchResults, calibration: calibrationResults, perspective: perspectiveResults,
       highAngle: highAngleResults, resetCompensation: Number(compensationInput.value),
