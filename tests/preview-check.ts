@@ -421,7 +421,7 @@ export async function runPreviewChecks() {
     // Switch the same fresh App to immersive mode, then exercise the actual
     // permission and DeviceOrientation event path. The first reading is the
     // calibration pose; subsequent readings are checked independently from
-    // A^T * B * +Z rather than reusing the production orientation helper.
+    // B^T * A * +Z rather than reusing the production orientation helper.
     const enterButton = Array.from(frameDocument.querySelectorAll<HTMLButtonElement>('.preview-footer button'))
       .find(button => button.textContent?.includes('沉浸体验'));
     if (!enterButton) throw new Error('Missing immersive preview button');
