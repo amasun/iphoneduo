@@ -172,7 +172,7 @@ body.immersive-viewport-active #root{position:relative;z-index:0;width:100%;heig
   --phone-width:min(320px,calc((100dvh - 260px)*.455),calc(100vw - 100px));
   position:fixed;inset:0;width:100%;height:100dvh;max-width:none;margin:0;padding:0;overflow:hidden;
   --glass-bg:rgba(24,32,28,.82);
-  color:#202521;background:#fff;
+  color:#202521;background:#f4f2f2;
 }
 .app:not(.is-immersive) .topbar{position:absolute;top:var(--hud-inset);left:var(--hud-inset);height:44px;padding:0;border:0;z-index:5;pointer-events:none}
 .app:not(.is-immersive) .wordmark{font-size:20px;letter-spacing:-.8px;color:#202521;pointer-events:auto}
