@@ -25,6 +25,8 @@ export interface RenderState {
   dim: number;
   /** CSS pixels from the camera to the neutral plane. */
   perspective: number;
+  /** 0..2 depth perspective: 0 is parallel projection, 1 is the calibrated eye. */
+  perspectiveStrength?: number;
 }
 
 export interface Renderer {
@@ -65,6 +67,7 @@ uniform sampler2D u_texture;
 uniform vec2 u_canvasSize;
 uniform vec2 u_imageSize;
 uniform vec3 u_cameraPosition;
+uniform float u_perspectiveStrength;
 uniform float u_devicePixelRatio;
 uniform float u_hingeSide;
 uniform mat3 u_rotation;
@@ -111,7 +114,10 @@ void main() {
   // use the screen center. The rigid plane never shrinks to fit the aperture.
   vec3 hingePivot = vec3(u_hingeSide * halfWidth, 0.0, 0.0);
   vec3 cameraPosition = u_cameraPosition;
-  vec3 rayDirection = vec3(screenPosition, 0.0) - cameraPosition;
+  vec3 rayOrigin = vec3(screenPosition, 0.0);
+  // For k > 0 these rays converge at cameraPosition / k. At k=0 they
+  // are parallel, with no large-distance approximation or precision loss.
+  vec3 rayDirection = u_perspectiveStrength * rayOrigin - cameraPosition;
   vec3 planeTranslation = hingePivot - u_rotation * hingePivot;
 
   // Intersect the screen ray with the rotated finite plane. For an
@@ -119,16 +125,18 @@ void main() {
   vec3 planeNormal = u_rotation * vec3(0.0, 0.0, 1.0);
   float denominator = dot(planeNormal, rayDirection);
   float validDenominator = step(0.00001, abs(denominator));
-  float rayDistance = dot(planeNormal, planeTranslation - cameraPosition)
+  float rayDistance = dot(planeNormal, planeTranslation - rayOrigin)
                     / max(abs(denominator), 0.00001);
   rayDistance *= sign(denominator);
-  vec3 worldPoint = cameraPosition + rayDistance * rayDirection;
+  vec3 worldPoint = rayOrigin + rayDistance * rayDirection;
   vec3 localPoint = transpose(u_rotation) * (worldPoint - planeTranslation);
 
   vec2 contentPoint = localPoint.xy;
   vec2 edgeDistance = abs(contentPoint) - u_canvasSize * 0.5;
   float rectangleDistance = max(edgeDistance.x, edgeDistance.y);
-  float validRay = validDenominator * step(0.0, rayDistance);
+  // Starting at the glass allows negative distances for content in front
+  // of it; reject only intersections behind the effective eye.
+  float validRay = validDenominator * step(0.0, 1.0 + u_perspectiveStrength * rayDistance);
   // Derivative-sized coverage avoids jagged projected plane edges while
   // keeping the physical edge sharp. The scene pass remains fully opaque.
   // Compute coverage per axis. Differentiating max(x,y) doubles the filter
@@ -228,6 +236,7 @@ interface SceneUniforms {
   canvasSize: WebGLUniformLocation | null;
   imageSize: WebGLUniformLocation | null;
   cameraPosition: WebGLUniformLocation | null;
+  perspectiveStrength: WebGLUniformLocation | null;
   devicePixelRatio: WebGLUniformLocation | null;
   hingeSide: WebGLUniformLocation | null;
   rotation: WebGLUniformLocation | null;
@@ -487,6 +496,7 @@ export function createRenderer(
       canvasSize: gl.getUniformLocation(sceneProgram, "u_canvasSize"),
       imageSize: gl.getUniformLocation(sceneProgram, "u_imageSize"),
       cameraPosition: gl.getUniformLocation(sceneProgram, "u_cameraPosition"),
+      perspectiveStrength: gl.getUniformLocation(sceneProgram, "u_perspectiveStrength"),
       devicePixelRatio: gl.getUniformLocation(sceneProgram, "u_devicePixelRatio"),
       hingeSide: gl.getUniformLocation(sceneProgram, "u_hingeSide"),
       rotation: gl.getUniformLocation(sceneProgram, "u_rotation"),
@@ -592,6 +602,7 @@ export function createRenderer(
       Math.max(1, Number.isFinite(state.perspective) ? state.perspective : 1950));
     gl.uniform2f(sceneUniforms.imageSize, ...layout.imageSize);
     gl.uniform3f(sceneUniforms.cameraPosition, ...layout.camera);
+    gl.uniform1f(sceneUniforms.perspectiveStrength, state.perspectiveStrength ?? 1);
     gl.uniform1f(sceneUniforms.devicePixelRatio, devicePixelRatio);
     gl.uniform1f(sceneUniforms.hingeSide, hingeSide);
     gl.uniformMatrix3fv(sceneUniforms.rotation, false, transposeRotation(state.rotation));
@@ -712,6 +723,8 @@ export function createRenderer(
         blur: state.blur,
         dim: state.dim,
         perspective: state.perspective,
+        perspectiveStrength: Number.isFinite(state.perspectiveStrength)
+          ? Math.max(0, Math.min(2, state.perspectiveStrength!)) : 1,
       };
       const measuredWidth = canvas.clientWidth || canvas.width || 1;
       const measuredHeight = canvas.clientHeight || canvas.height || 1;

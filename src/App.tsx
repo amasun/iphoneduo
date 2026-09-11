@@ -12,6 +12,7 @@ const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 const BASE_URL = import.meta.env.BASE_URL;
 const WALLPAPER_URL = `${BASE_URL}wallpaper.png`;
 const MAX_YAW = 80;
+const DEFAULT_PERSPECTIVE_STRENGTH = 0.5;
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 const transpose = (m: number[]) => [m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]];
 const statusNames = { idle: '手动模拟', requesting: '等待授权', waiting: '等待体感', active: '体感已连接', denied: '未获授权', unavailable: '手动模拟', insecure: '需要 HTTPS', error: '连接未完成' };
@@ -29,7 +30,7 @@ function startsImmersive() {
 }
 
 function initialCalibration() {
-  try { return parseViewingCalibration(window.localStorage.getItem(CALIBRATION_STORAGE_KEY)); }
+  try { return { ...parseViewingCalibration(window.localStorage.getItem(CALIBRATION_STORAGE_KEY)), screenShortCm: DEFAULT_CALIBRATION.screenShortCm }; }
   catch { return { ...DEFAULT_CALIBRATION }; }
 }
 
@@ -51,8 +52,8 @@ export default function App() {
   const [intro, setIntro] = useState(true);
   const [settings, setSettings] = useState<EffectSettings>({ ...DEFAULT_EFFECT_SETTINGS });
   const [calibration, setCalibration] = useState(initialCalibration);
-  const [calibrationSaved, setCalibrationSaved] = useState(false);
   const [compensation, setCompensation] = useState(DEFAULT_COMPENSATION);
+  const [perspectiveStrength, setPerspectiveStrength] = useState(DEFAULT_PERSPECTIVE_STRENGTH);
   const [yaw, setYaw] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [enabled, setEnabled] = useState(true);
@@ -70,15 +71,14 @@ export default function App() {
   const lastTap = useRef<{ x: number; y: number; time: number; pointerType: string } | null>(null);
   const hideAfterConnection = useRef(false);
   const lastHinge = useRef<'left' | 'right'>('left');
-  const frameState = useRef({ settings, calibration, compensation, yaw, playing, enabled, immersive, sensorActive: false, reducedMotion });
-  frameState.current = { settings, calibration, compensation, yaw, playing, enabled, immersive, sensorActive: sensor.status === 'active' || sensor.status === 'waiting', reducedMotion };
+  const frameState = useRef({ settings, calibration, compensation, perspectiveStrength, yaw, playing, enabled, immersive, sensorActive: false, reducedMotion });
+  frameState.current = { settings, calibration, compensation, perspectiveStrength, yaw, playing, enabled, immersive, sensorActive: sensor.status === 'active' || sensor.status === 'waiting', reducedMotion };
   useImmersiveViewport(immersive);
 
   useEffect(() => {
     try {
       window.localStorage.setItem(CALIBRATION_STORAGE_KEY, serializeViewingCalibration(calibration));
-      setCalibrationSaved(true);
-    } catch { setCalibrationSaved(false); }
+    } catch { /* Continue with in-memory settings when storage is unavailable. */ }
   }, [calibration]);
 
   useEffect(() => {
@@ -162,9 +162,9 @@ export default function App() {
       // At 100%, the observer follows the exact horizontal angle, including
       // turns above 45 degrees; pitch stays excluded from the whole scene.
       const viewerRotation = compensatedViewerRotation(angle, 0, s.compensation);
-      const signature = [...rotation, ...viewerRotation, amount.blur, amount.dim, scale, perspective, Number(s.immersive), Number(hinge === 'right')];
+      const signature = [...rotation, ...viewerRotation, amount.blur, amount.dim, scale, perspective, s.perspectiveStrength, Number(s.immersive), Number(hinge === 'right')];
       if (signature.some((value, i) => Math.abs(value - (previousDraw[i] ?? Infinity)) > 0.00001)) {
-        engine.current?.render({ rotation, viewerRotation, hinge, blur: amount.blur * scale, dim: amount.dim, perspective });
+        engine.current?.render({ rotation, viewerRotation, hinge, blur: amount.blur * scale, dim: amount.dim, perspective, perspectiveStrength: s.perspectiveStrength });
         previousDraw = signature;
         if (device.current) {
           // The desktop phone frame turns around its center. Its inner scene
@@ -177,7 +177,8 @@ export default function App() {
         }
         if (fallback.current) {
           fallback.current.style.transformOrigin = `${hinge} center`;
-          fallback.current.style.transform = `perspective(${perspective}px) ${matrixToCss3d(rotation)}`;
+          const fallbackPerspective = s.perspectiveStrength > 0 ? `perspective(${perspective / s.perspectiveStrength}px)` : '';
+          fallback.current.style.transform = `${fallbackPerspective} ${matrixToCss3d(rotation)}`;
           fallback.current.style.filter = `blur(${amount.blur * scale}px) brightness(${1 - amount.dim})`;
         }
       }
@@ -304,19 +305,12 @@ export default function App() {
           {(isConnected || isBusy) && <button className="text-button" onClick={manual}>切换到手动模拟</button>}
         </div>
 
-        <div className="section-label tuning-label"><h3>微调空间</h3><button className="subtle-reset" onClick={() => { setSettings({ ...DEFAULT_EFFECT_SETTINGS }); setCompensation(DEFAULT_COMPENSATION); setCalibration({ ...DEFAULT_CALIBRATION }); }} aria-label="重置效果参数"><RotateCcw size={13} />还原</button><button className="panel-close tuning-close" onClick={() => setPanelOpen(false)} aria-label="关闭参数面板"><X size={18} /></button></div>
+        <div className="section-label tuning-label"><h3>微调空间</h3><button className="subtle-reset" onClick={() => { setSettings({ ...DEFAULT_EFFECT_SETTINGS }); setCompensation(DEFAULT_COMPENSATION); setPerspectiveStrength(DEFAULT_PERSPECTIVE_STRENGTH); setCalibration({ ...DEFAULT_CALIBRATION }); }} aria-label="重置效果参数"><RotateCcw size={13} />还原</button><button className="panel-close tuning-close" onClick={() => setPanelOpen(false)} aria-label="关闭参数面板"><X size={18} /></button></div>
         <p className="geometry-note">手动与体感均为 1:1 反向旋转 · 左右各 80°</p>
         <Range label="拉伸补偿" value={compensation * 100} min={0} max={100} unit="%" onChange={v => setCompensation(v / 100)} hint="100% 按实际左右角度补偿；降低可减轻横向展开。" />
+        <Range label="远侧收缩" value={perspectiveStrength * 100} min={0} max={200} unit="%" onChange={v => setPerspectiveStrength(v / 100)} hint="调低可减轻远侧变小；0% 无近远收缩，100% 为原透视。默认 50%。" />
         <Range label="开始失焦" value={settings.threshold} min={0} max={28} unit="°" onChange={v => update('threshold', v)} />
         <Range label="透视距离" value={calibration.distanceCm} min={20} max={100} unit="cm" onChange={v => setCalibration(c => ({ ...c, distanceCm: v }))} hint={`设为眼睛到屏幕中心的实际距离，默认 ${DEFAULT_CALIBRATION.distanceCm}cm。`} />
-        <details className="viewing-calibration" open={immersive || undefined}>
-          <summary>屏幕与观看校准<ChevronDown size={14} /></summary>
-          <p>{Math.abs(calibration.screenShortCm - DEFAULT_CALIBRATION.screenShortCm) < 0.005 ? '当前按 iPhone 14 Pro 屏幕规格设置。' : '当前使用自定义屏幕尺寸。'}测量时只量发光区域，不含边框。</p>
-          <Range label="屏幕短边" value={calibration.screenShortCm} min={5} max={10} step={0.01} unit="cm" onChange={v => setCalibration(c => ({ ...c, screenShortCm: v }))} />
-          <p>量好眼睛到屏幕中心的距离，填入上方「透视距离」。保持屏幕中心正对双眼之间，再校准正面。</p>
-          <button className="text-button" onClick={isConnected ? reset : enableSensor}><Crosshair size={13} />{isConnected ? '以当前姿态校准正面' : '正对屏幕并启用体感'}</button>
-          <p className="calibration-save-note" role="status">{calibrationSaved ? '距离与尺寸已记住，刷新后保留。' : '距离与尺寸仅用于本次体验。'}</p>
-        </details>
         <Range label="失焦程度" value={settings.blur} min={0} max={MAX_BLUR} unit="px" onChange={v => update('blur', v)} hint="失焦越深，画面越暗；固定边缘保持清晰。" />
 
         <div className="effect-switch-row"><div><Sparkles size={15} /><span>空间效果</span></div><button role="switch" aria-checked={enabled} aria-label="空间效果开关" className={`switch ${enabled ? 'on' : ''}`} onClick={() => setEnabled(v => !v)}><span /></button></div>

@@ -14,11 +14,13 @@
   import { runViewerChecks } from './viewer-check.ts';
   import { runObserverChecks } from './observer-check.ts';
   import { runPreviewChecks } from './preview-check.ts';
+  import { runPerspectiveChecks } from './perspective-check.ts';
   window.rendererCheck = (async () => ({
     postprocess: await runPostprocessChecks(),
     aspect: await runAspectChecks(),
     viewer: await runViewerChecks(),
     observer: await runObserverChecks(),
+    perspective: await runPerspectiveChecks(),
     preview: await runPreviewChecks(),
   }))().then(result => {
     document.getElementById('result').textContent = '全部通过\n' + JSON.stringify(result, null, 2);
