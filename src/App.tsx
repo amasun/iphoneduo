@@ -367,7 +367,7 @@ export default function App() {
           </div>
           {!immersive && <canvas ref={modelCanvas} className="phone-model-canvas" role="img" aria-label="可旋转的 iPhone 17 Pro Max 三维模型，屏幕实时呈现倾斜效果" aria-hidden={!modelAspect} />}
         </div>
-        <div className="preview-footer"><span><span className={`tiny-dot ${isConnected ? 'live' : ''}`} />{statusNames[sensor.status]}</span><button onClick={() => { setImmersive(true); setPanelOpen(false); setControlsVisible(!isMobilePreview()); }}><Expand size={15} />沉浸体验<ArrowUpRight size={14} /></button></div>
+        <div className="preview-footer"><span><span className={`tiny-dot ${isConnected ? 'live' : ''}`} />{statusNames[sensor.status]}</span><button onClick={() => { setImmersive(true); setPanelOpen(false); setControlsVisible(!isMobilePreview()); }}><Expand size={16} />沉浸体验</button><button className="dashboard-settings" onClick={() => setPanelOpen(value => !value)} aria-label="打开效果调节" aria-expanded={panelOpen} aria-controls="controls"><Settings2 size={18} /><span>调节</span></button></div>
         {!immersive && <div className="model-credit"><a href="https://sketchfab.com/3d-models/iphone-17-pro-max-87fc1df741384124a8ce0226d2b2058d" target="_blank" rel="noreferrer">iPhone 17 Pro Max</a><span>·</span><a href="https://sketchfab.com/MG990" target="_blank" rel="noreferrer">MajdyModels</a><span>·</span><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a><span>· 实时屏幕改编</span></div>}
         {!immersive && modelError && <p className="model-load-notice" role="status">{modelError}</p>}
       </section>
@@ -397,11 +397,11 @@ export default function App() {
       </aside>
 
       <section className="simulation-panel" aria-label="手动模拟与实时读数">
-        <div className="simulation-heading"><h2>旋转</h2><button className="demo-button" onClick={activateDemo}>{playing ? <Pause size={15} /> : <Play size={15} />} {playing ? '暂停演示' : '播放演示'}</button></div>
+        <div className="simulation-heading"><h2>旋转</h2><button className="demo-button" onClick={activateDemo} aria-label={playing ? '暂停演示' : '播放演示'} title={playing ? '暂停演示' : '播放演示'}>{playing ? <Pause size={18} /> : <Play size={18} />}<span>{playing ? '暂停演示' : '播放演示'}</span></button></div>
         <div className="simulation-grid"><div className="manual-controls">
           <Range label="左右倾斜" value={immersive ? yaw : wrapDegrees(yaw)} min={immersive ? -MAX_YAW : -180} max={immersive ? MAX_YAW : 180} unit="°" onChange={v => { manual(); setYaw(v); }} />
         </div></div>
-        <div className="simulation-bottom"><span>拖动查看机身</span><button onClick={reset}><Crosshair size={14} />回到正面</button></div>
+        <div className="simulation-bottom"><span>拖动查看机身</span><button onClick={reset} aria-label="回到正面" title="回到正面"><RotateCcw size={18} /><span>回到正面</span></button></div>
       </section>
     </main>
 

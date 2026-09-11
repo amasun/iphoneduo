@@ -166,30 +166,71 @@ body.immersive-viewport-active #root{position:relative;z-index:0;width:100%;heig
 .model-credit a:hover{text-decoration:underline}
 .model-load-notice{padding:8px 16px 12px;text-align:center;font-size:11px;color:#626b5a}
 
-/* Keep the model and its controls as the main desktop composition. */
-.topbar{height:64px;border:0}
-.wordmark{font-size:20px;letter-spacing:-.8px}
-.workspace{padding:12px 0 28px}
-.app:not(.is-immersive) .stage{height:clamp(540px,calc(100svh - 160px),740px);padding:24px;background:#e9ece5}
-.app:not(.is-immersive) .device{width:clamp(210px,calc((100svh - 240px)*.45),280px)}
-.app:not(.is-immersive) .device-shadow{margin-left:0;bottom:24px;opacity:.6}
-.app:not(.is-immersive) .controls{padding:18px}
-.controls .connection-card{padding:0;margin:0 0 20px;border:0;background:transparent}
-.controls .connection-card .primary-button{justify-content:center;gap:8px}
-.controls .tuning-label{min-height:44px;margin-bottom:8px}
-.controls .range-field{margin:12px 0}
-.preview-footer{height:48px;padding-inline:20px;background:transparent}
-.model-credit{padding:8px 12px;border-top:0;font-size:8px}
-.simulation-panel{padding:16px 18px 0}
-.simulation-heading h2{font-size:15px;margin:0}
-.simulation-grid{display:block;margin-top:10px}
-.manual-controls{padding:0;border:0}
-.simulation-bottom{margin-top:8px}
+/* One viewport, one continuous scene, with floating controls around it. */
+.app:not(.is-immersive){
+  --hud-inset:clamp(16px,2.2vw,32px);
+  --phone-width:min(320px,calc((100dvh - 260px)*.455),calc(100vw - 100px));
+  position:fixed;inset:0;width:100%;height:100dvh;max-width:none;margin:0;padding:0;overflow:hidden;
+  color:#e9edeb;background:radial-gradient(ellipse at 50% 45%,#303638 0%,#202527 38%,#15191b 75%);
+}
+.app:not(.is-immersive) .topbar{position:absolute;top:var(--hud-inset);left:var(--hud-inset);height:44px;padding:0;border:0;z-index:5;pointer-events:none}
+.app:not(.is-immersive) .wordmark{font-size:20px;letter-spacing:-.8px;color:#edf1ef;pointer-events:auto}
+.app:not(.is-immersive) .workspace{position:absolute;inset:0;display:block;width:100%;height:100%;padding:0;margin:0}
+.app:not(.is-immersive) .preview-panel{position:absolute;inset:0;min-width:0;border:0;border-radius:0;background:transparent;overflow:visible}
+.app:not(.is-immersive) .stage{position:absolute;inset:0;width:100%;height:100%;padding:0;background:transparent}
+.app:not(.is-immersive) .device{width:var(--phone-width)}
+.app:not(.is-immersive) .device-shadow{display:none}
+.app:not(.is-immersive) .preview-footer{position:absolute;top:var(--hud-inset);right:var(--hud-inset);height:44px;padding:0;display:flex;gap:8px;border:0;background:none;z-index:7}
+.app:not(.is-immersive) .preview-footer>span{position:fixed;left:var(--hud-inset);bottom:58px;color:#b8c5c0;font-size:11px}
+.app:not(.is-immersive) .preview-footer button{height:44px;padding:0 15px;gap:8px;border-radius:22px;font-size:12px;color:#edf1ef;border:1px solid var(--glass-border);background:var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur)}
+.app:not(.is-immersive) .preview-footer button[aria-expanded=true]{background:#ffffff1c;border-color:#ffffff40}
+.app:not(.is-immersive) .model-credit{position:absolute;bottom:20px;left:var(--hud-inset);right:auto;z-index:5;max-width:calc(50% - 250px);padding:0;justify-content:flex-start;border:0;font-size:9px;line-height:1.6;color:#89948f}
+.app:not(.is-immersive) .model-load-notice{position:absolute;top:82px;left:50%;transform:translateX(-50%);color:#d1dad5;font-size:12px}
+
+.app:not(.is-immersive) .controls{display:none;position:absolute;top:calc(var(--hud-inset) + 56px);right:var(--hud-inset);width:320px;max-width:calc(100% - 32px);max-height:calc(100% - var(--hud-inset) - 170px);padding:12px 16px 16px;overflow:auto;overscroll-behavior:contain;border-radius:24px;z-index:8;--panel-bg:var(--glass-bg)}
+.app:not(.is-immersive) .controls.panel-open{display:block;animation:tuning-enter .18s ease-out}
+.app:not(.is-immersive) .controls .connection-card{padding:0;margin:0 0 10px;border:0;background:transparent}
+.app:not(.is-immersive) .controls .connection-card .primary-button{justify-content:center;gap:8px;border-radius:12px}
+.app:not(.is-immersive) .controls .tuning-label{min-height:44px;gap:6px;margin:0 0 4px}
+.app:not(.is-immersive) .controls .tuning-label h3{font-size:14px;font-weight:500}
+.app:not(.is-immersive) .controls .subtle-reset{min-width:48px;min-height:44px;font-size:12px;padding:0 4px}
+.app:not(.is-immersive) .controls .tuning-close{display:flex;align-items:center;justify-content:center;width:44px;height:44px;padding:0;flex-shrink:0;border-radius:50%;background:#ffffff0c}
+.app:not(.is-immersive) .controls .range-field{margin:10px 0}
+.app:not(.is-immersive) .controls .range-label :is(label,output){font-size:13px}
+.app:not(.is-immersive) .controls .instructions{font-size:12px}
+
+.app:not(.is-immersive) .simulation-panel{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:16px;width:440px;max-width:calc(100% - 32px);padding:12px 16px;border-radius:24px;z-index:6;--panel-bg:var(--glass-bg)}
+.app:not(.is-immersive) :is(.simulation-heading,.simulation-bottom){display:contents}
+.app:not(.is-immersive) :is(.simulation-heading h2,.simulation-heading button span,.simulation-bottom>span,.simulation-bottom button span){display:none}
+.app:not(.is-immersive) :is(.demo-button,.simulation-bottom button){width:44px;height:44px;min-height:44px;padding:0;display:flex;align-items:center;justify-content:center;border:0;border-radius:50%;background:#ffffff0c;color:#ecf2ee}
+.app:not(.is-immersive) :is(.demo-button,.simulation-bottom button):hover{background:#ffffff20}
+.app:not(.is-immersive) .simulation-grid{display:block;margin:0;min-width:0}
+.app:not(.is-immersive) .manual-controls{padding:0;border:0}
+.app:not(.is-immersive) .manual-controls .range-field{margin:0}
+.app:not(.is-immersive) .manual-controls .range-label{margin:0 0 2px}
+.app:not(.is-immersive) .manual-controls .range-label :is(label,output){font-size:12px}
+.app:not(.is-immersive) .manual-controls input{height:28px;margin:0}
 .is-immersive .intro-card{padding:20px 20px 8px}
 .is-immersive .intro-card p{margin-bottom:16px}
-@media(min-width:760px){
-  .app:not(.is-immersive) .workspace{grid-template-columns:minmax(0,1fr) 320px;grid-template-rows:auto 1fr;gap:20px 28px}
-  .app:not(.is-immersive) .preview-panel{grid-column:1;grid-row:1 / span 2}
-  .app:not(.is-immersive) .controls{grid-column:2;grid-row:1}
-  .app:not(.is-immersive) .simulation-panel{grid-column:2;grid-row:2;align-self:start}
+@media(max-width:1100px){
+  .app:not(.is-immersive) .model-credit{bottom:8px;left:16px;right:16px;max-width:none;justify-content:center;font-size:8px}
+  .app:not(.is-immersive) .simulation-panel{bottom:38px}
+  .app:not(.is-immersive) .preview-footer>span{top:calc(var(--hud-inset) + 44px);bottom:auto;font-size:10px}
+}
+@media(max-height:600px){
+  .app:not(.is-immersive){--phone-width:min(210px,calc((100dvh - 200px)*.455),calc(100vw - 100px))}
+  .app:not(.is-immersive) .simulation-panel{bottom:32px;padding:6px 12px;border-radius:20px}
+  .app:not(.is-immersive) .controls{max-height:calc(100% - var(--hud-inset) - 155px)}
+}
+@media(max-width:480px){
+  .app:not(.is-immersive) .wordmark{font-size:17px}
+  .app:not(.is-immersive) .preview-footer button{padding:0 12px;font-size:11px}
+  .app:not(.is-immersive) .dashboard-settings span{display:none}
+}
+@media(prefers-reduced-motion:reduce){.app:not(.is-immersive) .controls.panel-open{animation:none}}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .app:not(.is-immersive) :is(.controls,.simulation-panel,.preview-footer button){background:#202824}
+}
+@media(prefers-reduced-transparency:reduce){
+  .app:not(.is-immersive) :is(.controls,.simulation-panel,.preview-footer button){background:#202824;backdrop-filter:none;-webkit-backdrop-filter:none}
 }
