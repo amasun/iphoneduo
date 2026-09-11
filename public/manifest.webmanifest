@@ -1,0 +1,11 @@
+{
+  "id": "./",
+  "name": "INSIDE — 屏幕之内",
+  "short_name": "INSIDE",
+  "lang": "zh-CN",
+  "start_url": "./?immersive=1",
+  "scope": "./",
+  "display": "fullscreen",
+  "background_color": "#dcdcdc",
+  "icons": [{ "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

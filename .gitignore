@@ -1,0 +1,12 @@
+node_modules/
+dist/
+certs/
+*.tsbuildinfo
+.DS_Store
+.qa/
+.pnpm-store/
+.agents/
+.env
+.env.*
+!.env.example
+*.log

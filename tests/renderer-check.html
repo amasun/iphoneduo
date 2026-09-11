@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>透视与 WebGL 效果检查</title>
+<style>body{font:15px/1.7 system-ui;margin:32px;background:#f3f3ed;color:#262b25}pre{white-space:pre-wrap}a{color:inherit}</style>
+<h1>透视与 WebGL 效果检查</h1>
+<p>检查完整画面透视、可调视角补偿、固定边缘、体感单轴翻转、渐进模糊、尺寸变化及上下文恢复。</p>
+<pre id="result">检查中…</pre>
+<a href="/">返回演示</a>
+<script type="module">
+  import { runPostprocessChecks } from './renderer-check.ts';
+  import { runAspectChecks } from './aspect-check.ts';
+  import { runViewerChecks } from './viewer-check.ts';
+  import { runObserverChecks } from './observer-check.ts';
+  import { runPreviewChecks } from './preview-check.ts';
+  window.rendererCheck = (async () => ({
+    postprocess: await runPostprocessChecks(),
+    aspect: await runAspectChecks(),
+    viewer: await runViewerChecks(),
+    observer: await runObserverChecks(),
+    preview: await runPreviewChecks(),
+  }))().then(result => {
+    document.getElementById('result').textContent = '全部通过\n' + JSON.stringify(result, null, 2);
+    return { passed: true, result };
+  }).catch(error => {
+    document.getElementById('result').textContent = '检查失败\n' + error.message;
+    return { passed: false, error: error.message };
+  });
+</script>
+</html>
