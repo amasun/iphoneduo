@@ -352,85 +352,56 @@ export async function runPreviewChecks() {
       throw new Error(`Screen short-edge calibration is not 5..10/0.01/6.51: ${screenShortInput.min}..${screenShortInput.max}/${screenShortInput.step}/${screenShortInput.value}`);
     }
 
-    // This control is independent of the visual effect presets. Set a
-    // non-default value, select a preset, and verify that the camera tuning
-    // survives the settings replacement before restoring the documented 100%.
-    setRangeValue(frameWindow, compensationInput, 73);
-    await waitFor(() => compensationInput.value === '73',
-      'Stretch compensation slider did not accept 73%');
-    const compensationBeforePreset = compensationInput.value;
-    const persistenceButton = Array.from(frameDocument.querySelectorAll<HTMLButtonElement>('.presets button'))
-      .find(button => button.textContent?.includes('轻盈'));
-    if (!persistenceButton) throw new Error('Missing preset button for compensation persistence check');
-    persistenceButton.click();
-    await wait(80);
-    if (compensationInput.value !== compensationBeforePreset) {
-      throw new Error('Effect preset reset independent stretch compensation');
-    }
-    setRangeValue(frameWindow, compensationInput, 100);
-    await waitFor(() => compensationInput.value === '100',
-      'Stretch compensation slider did not restore its 100% default');
     const framedCompensation = Number(compensationInput.value) / 100;
 
-    const profiles: Array<[string, string]> = [
-      ['gentle', '轻盈'], ['balanced', '平衡'], ['deep', '深邃'],
-    ];
     const results: Record<string, unknown>[] = [];
-    for (const [profile, label] of profiles) {
-      const profileButton = Array.from(frameDocument.querySelectorAll<HTMLButtonElement>('.presets button'))
-        .find(button => button.textContent?.includes(label));
-      if (!profileButton) throw new Error(`Missing ${profile} preset button`);
-      profileButton.click();
-      await wait(100);
+    for (const requestedYaw of [55, -55]) {
+      const before = state.draws.length;
+      setRangeValue(frameWindow, yawInput, requestedYaw);
+      await waitFor(() => state.draws.length > before,
+        `Framed/${requestedYaw}: slider caused no scene draw`);
+      // Manual pose easing settles in a few frames. Read after it reaches
+      // the requested angle so a stale intermediate transform cannot pass.
+      await wait(260);
+      const draw = state.draws[state.draws.length - 1];
+      const cssYDown = parseTransform(frameWindow.getComputedStyle(device).transform);
+      const outerInverse = cssToYUp(cssYDown);
+      const rotationError = maxDifference(multiply(draw.rotation, outerInverse), IDENTITY);
+      const outerDeterminantError = Math.abs(determinant(outerInverse) - 1);
+      const poseYaw = yawDegrees(draw.rotation);
+      const perspective = Number.parseFloat(frameWindow.getComputedStyle(stage).perspective);
+      const expectedCamera = compensatedCamera(poseYaw, 0, framedCompensation, perspective);
+      const expectedFramedPerspective = Number(distanceInput.value) / Number(screenShortInput.value)
+        * Math.min(canvas.clientWidth, canvas.clientHeight);
+      const cameraError = maxDifference(draw.camera, expectedCamera);
+      const origin = frameWindow.getComputedStyle(stage).perspectiveOrigin;
+      const expectedOriginX = device.offsetLeft + device.offsetWidth / 2;
+      const expectedOriginY = device.offsetTop + device.offsetHeight / 2;
+      const originNumbers = origin.match(/-?(?:\d+\.?\d*|\.\d+)/g)?.map(Number) ?? [];
+      const originError = originNumbers.length >= 2
+        ? Math.max(Math.abs(originNumbers[0] - expectedOriginX), Math.abs(originNumbers[1] - expectedOriginY))
+        : Infinity;
 
-      for (const requestedYaw of [55, -55]) {
-        const before = state.draws.length;
-        setRangeValue(frameWindow, yawInput, requestedYaw);
-        await waitFor(() => state.draws.length > before,
-          `${profile}/${requestedYaw}: slider caused no scene draw`);
-        // Manual pose easing settles in a few frames. Read after it reaches
-        // the requested angle so a stale intermediate transform cannot pass.
-        await wait(260);
-        const draw = state.draws[state.draws.length - 1];
-        const cssYDown = parseTransform(frameWindow.getComputedStyle(device).transform);
-        const outerInverse = cssToYUp(cssYDown);
-        const rotationError = maxDifference(multiply(draw.rotation, outerInverse), IDENTITY);
-        const outerDeterminantError = Math.abs(determinant(outerInverse) - 1);
-        const poseYaw = yawDegrees(draw.rotation);
-        const perspective = Number.parseFloat(frameWindow.getComputedStyle(stage).perspective);
-        const expectedCamera = compensatedCamera(poseYaw, 0, framedCompensation, perspective);
-        const expectedFramedPerspective = Number(distanceInput.value) / Number(screenShortInput.value)
-          * Math.min(canvas.clientWidth, canvas.clientHeight);
-        const cameraError = maxDifference(draw.camera, expectedCamera);
-        const origin = frameWindow.getComputedStyle(stage).perspectiveOrigin;
-        const expectedOriginX = device.offsetLeft + device.offsetWidth / 2;
-        const expectedOriginY = device.offsetTop + device.offsetHeight / 2;
-        const originNumbers = origin.match(/-?(?:\d+\.?\d*|\.\d+)/g)?.map(Number) ?? [];
-        const originError = originNumbers.length >= 2
-          ? Math.max(Math.abs(originNumbers[0] - expectedOriginX), Math.abs(originNumbers[1] - expectedOriginY))
-          : Infinity;
-
-        if (!Number.isFinite(perspective) || perspective <= 0) {
-          throw new Error(`${profile}/${requestedYaw}: missing stage perspective`);
-        }
-        if (Math.abs(perspective - expectedFramedPerspective) > 1.5) {
-          throw new Error(`${profile}/${requestedYaw}: perspective ${perspective.toFixed(2)}px != calibrated ${expectedFramedPerspective.toFixed(2)}px`);
-        }
-        if (Math.abs(Math.abs(poseYaw) - 55) > 2.5) {
-          throw new Error(`${profile}/${requestedYaw}: pose stopped at ${poseYaw.toFixed(2)}°`);
-        }
-        if (rotationError > 0.002 || outerDeterminantError > 0.002) {
-          throw new Error(`${profile}/${requestedYaw}: scene/CSS rotation product error ${rotationError.toFixed(4)}`);
-        }
-        if (cameraError > 1.5) {
-          throw new Error(`${profile}/${requestedYaw}: camera pose error ${cameraError.toFixed(2)}px`);
-        }
-        if (originError > 1.5) {
-          throw new Error(`${profile}/${requestedYaw}: perspective origin error ${originError.toFixed(2)}px`);
-        }
-        results.push({ profile, requestedYaw, poseYaw, rotationError, cameraError, perspective,
-          expectedFramedPerspective, originError });
+      if (!Number.isFinite(perspective) || perspective <= 0) {
+        throw new Error(`Framed/${requestedYaw}: missing stage perspective`);
       }
+      if (Math.abs(perspective - expectedFramedPerspective) > 1.5) {
+        throw new Error(`Framed/${requestedYaw}: perspective ${perspective.toFixed(2)}px != calibrated ${expectedFramedPerspective.toFixed(2)}px`);
+      }
+      if (Math.abs(Math.abs(poseYaw) - 55) > 2.5) {
+        throw new Error(`Framed/${requestedYaw}: pose stopped at ${poseYaw.toFixed(2)}°`);
+      }
+      if (rotationError > 0.002 || outerDeterminantError > 0.002) {
+        throw new Error(`Framed/${requestedYaw}: scene/CSS rotation product error ${rotationError.toFixed(4)}`);
+      }
+      if (cameraError > 1.5) {
+        throw new Error(`Framed/${requestedYaw}: camera pose error ${cameraError.toFixed(2)}px`);
+      }
+      if (originError > 1.5) {
+        throw new Error(`Framed/${requestedYaw}: perspective origin error ${originError.toFixed(2)}px`);
+      }
+      results.push({ requestedYaw, poseYaw, rotationError, cameraError, perspective,
+        expectedFramedPerspective, originError });
     }
 
     // Switch the same fresh App to immersive mode, then exercise the actual
@@ -455,47 +426,39 @@ export async function runPreviewChecks() {
     const expectedDistance = Number(distanceInput.value) / Number(screenShortInput.value)
       * Math.min(canvas.clientWidth, canvas.clientHeight);
 
-    // Before enabling the sensor, every preset must use the same manual plane
-    // angle and camera rule. This catches the old immersive-only gain and
+    // Before enabling the sensor, check the same manual plane angle and
+    // camera rule. This catches the old immersive-only gain and
     // max-angle branch, which made the desktop and phone paths disagree.
     const immersiveManualResults: Record<string, unknown>[] = [];
     const manualAngles = [30, -30, 60, -60, 75, -75, 80, -80];
-    for (const [profile, label] of profiles) {
-      const profileButton = Array.from(frameDocument.querySelectorAll<HTMLButtonElement>('.presets button'))
-        .find(button => button.textContent?.includes(label));
-      if (!profileButton) throw new Error(`Missing immersive ${profile} preset button`);
-      profileButton.click();
-      await wait(80);
-
-      for (const requestedYaw of manualAngles) {
-        const before = state.draws.length;
-        setRangeValue(frameWindow, yawInput, requestedYaw);
-        await waitFor(() => state.draws.length > before,
-          `Immersive ${profile}/${requestedYaw}: slider caused no scene draw`);
-        const expectedYaw = clamp(-requestedYaw, -80, 80);
-        const expectedPlane = rotationY(expectedYaw);
-        // Compare settled geometry. A fixed delay can sample the manual easing
-        // mid-flight, especially when traversing from +80 to -80 degrees.
-        await waitFor(() => maxDifference(state.draws[state.draws.length - 1].rotation, expectedPlane) < 0.0002,
-          `Immersive ${profile}/${requestedYaw}: plane did not settle to the requested angle`);
-        const draw = state.draws[state.draws.length - 1];
-        const expectedCamera = compensatedCamera(expectedYaw, 0,
-          Number(compensationInput.value) / 100, expectedDistance);
-        const planeError = maxDifference(draw.rotation, expectedPlane);
-        const cameraError = maxDifference(draw.camera, expectedCamera);
-        const actualYaw = yawDegrees(draw.rotation);
-        if (planeError > 0.003 || angularDifference(actualYaw, expectedYaw) > 1.5) {
-          throw new Error(`Immersive ${profile}/${requestedYaw}: plane ${actualYaw.toFixed(2)}° != ${expectedYaw.toFixed(2)}°`);
-        }
-        if (cameraError > 3) {
-          throw new Error(`Immersive ${profile}/${requestedYaw}: camera error ${cameraError.toFixed(2)}px`);
-        }
-        if (Math.abs(draw.camera[1]) > 0.01) {
-          throw new Error(`Immersive ${profile}/${requestedYaw}: camera responded to a non-yaw axis`);
-        }
-        immersiveManualResults.push({ profile, requestedYaw, expectedYaw, actualYaw,
-          planeError, cameraError, expectedDistance });
+    for (const requestedYaw of manualAngles) {
+      const before = state.draws.length;
+      setRangeValue(frameWindow, yawInput, requestedYaw);
+      await waitFor(() => state.draws.length > before,
+        `Immersive ${requestedYaw}: slider caused no scene draw`);
+      const expectedYaw = clamp(-requestedYaw, -80, 80);
+      const expectedPlane = rotationY(expectedYaw);
+      // Compare settled geometry. A fixed delay can sample the manual easing
+      // mid-flight, especially when traversing from +80 to -80 degrees.
+      await waitFor(() => maxDifference(state.draws[state.draws.length - 1].rotation, expectedPlane) < 0.0002,
+        `Immersive ${requestedYaw}: plane did not settle to the requested angle`);
+      const draw = state.draws[state.draws.length - 1];
+      const expectedCamera = compensatedCamera(expectedYaw, 0,
+        Number(compensationInput.value) / 100, expectedDistance);
+      const planeError = maxDifference(draw.rotation, expectedPlane);
+      const cameraError = maxDifference(draw.camera, expectedCamera);
+      const actualYaw = yawDegrees(draw.rotation);
+      if (planeError > 0.003 || angularDifference(actualYaw, expectedYaw) > 1.5) {
+        throw new Error(`Immersive ${requestedYaw}: plane ${actualYaw.toFixed(2)}° != ${expectedYaw.toFixed(2)}°`);
       }
+      if (cameraError > 3) {
+        throw new Error(`Immersive ${requestedYaw}: camera error ${cameraError.toFixed(2)}px`);
+      }
+      if (Math.abs(draw.camera[1]) > 0.01) {
+        throw new Error(`Immersive ${requestedYaw}: camera responded to a non-yaw axis`);
+      }
+      immersiveManualResults.push({ requestedYaw, expectedYaw, actualYaw,
+        planeError, cameraError, expectedDistance });
     }
 
     // Keep one manual pose to compare with the identical calibrated sensor
@@ -706,8 +669,7 @@ export async function runPreviewChecks() {
 
     // Hold one mixed sensor pose and vary only the stretch compensation. The
     // plane hinge is fixed, while the observer camera must move at 0%, 50%,
-    // and 100%. This also proves that compensation is a separate control from
-    // the effect presets exercised above.
+    // and 100%. Compensation must remain independent from the image angle.
     const sweepReading: [number, number, number] = [35, 70, 10];
     const sweepYaw = expectedHorizontalYaw(calibration, sweepReading, screenAngle);
     const sweepPlane = rotationY(sweepYaw);

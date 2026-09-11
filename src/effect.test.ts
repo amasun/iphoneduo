@@ -1,15 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { effectAtAngle, profiles } from './effect.ts';
+import { DEFAULT_EFFECT_SETTINGS, effectAtAngle } from './effect.ts';
 
 test('the calibrated face stays sharp and at the screen surface', () => {
-  for (const settings of Object.values(profiles)) {
-    assert.deepEqual(effectAtAngle(0, settings), { progress: 0, blur: 0, dim: 0 });
-    assert.equal(effectAtAngle(settings.threshold, settings).blur, 0);
-  }
+  assert.deepEqual(effectAtAngle(0, DEFAULT_EFFECT_SETTINGS), { progress: 0, blur: 0, dim: 0 });
+  assert.equal(effectAtAngle(DEFAULT_EFFECT_SETTINGS.threshold, DEFAULT_EFFECT_SETTINGS).blur, 0);
 });
 test('defocus increases symmetrically and remains bounded', () => {
-  const settings = profiles.balanced;
+  const settings = DEFAULT_EFFECT_SETTINGS;
   let previous = 0;
   let previousDim = 0;
   for (let angle = 0; angle < 180; angle++) {
@@ -24,7 +22,7 @@ test('defocus increases symmetrically and remains bounded', () => {
 });
 
 test('darkness follows the chosen blur strength and disappears at zero blur', () => {
-  const settings = profiles.balanced;
+  const settings = DEFAULT_EFFECT_SETTINGS;
   assert.equal(effectAtAngle(52, { ...settings, blur: 0 }).dim, 0);
   const strengths = [16, 24, 48, 96, 120].map(blur => effectAtAngle(52, { ...settings, blur }));
   for (let index = 1; index < strengths.length; index++) {

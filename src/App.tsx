@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
-import { ArrowDown, ArrowUpRight, Check, ChevronDown, Crosshair, Expand, Hand, Layers3, Maximize2, MoveUpRight, Pause, Play, RotateCcw, Settings2, Smartphone, Sparkles, X } from 'lucide-react';
+import { ArrowDown, ArrowUpRight, ChevronDown, Crosshair, Expand, Hand, Layers3, Maximize2, MoveUpRight, Pause, Play, RotateCcw, Settings2, Smartphone, Sparkles, X } from 'lucide-react';
 import { axisRotation, horizontalCorrectionDegrees, interpolateRotation, matrixToCss3d, signedYawDegrees } from './orientation';
 import { createRenderer } from './renderer';
-import { effectAtAngle, MAX_BLUR, profiles, type EffectSettings } from './effect';
+import { DEFAULT_EFFECT_SETTINGS, effectAtAngle, MAX_BLUR, type EffectSettings } from './effect';
 import { useOrientation } from './useOrientation';
 import { useImmersiveViewport } from './useImmersiveViewport';
 import { compensatedViewerRotation, DEFAULT_COMPENSATION } from './compensation';
@@ -11,7 +11,6 @@ import { CALIBRATION_STORAGE_KEY, DEFAULT_CALIBRATION, parseViewingCalibration, 
 const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 const BASE_URL = import.meta.env.BASE_URL;
 const WALLPAPER_URL = `${BASE_URL}wallpaper.png`;
-const DEFAULT_PROFILE = 'deep';
 const MAX_YAW = 80;
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 const transpose = (m: number[]) => [m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]];
@@ -50,11 +49,10 @@ export default function App() {
   const [controlsVisible, setControlsVisible] = useState(() => !isMobilePreview());
   const [panelOpen, setPanelOpen] = useState(false);
   const [intro, setIntro] = useState(true);
-  const [settings, setSettings] = useState<EffectSettings>({ ...profiles[DEFAULT_PROFILE] });
+  const [settings, setSettings] = useState<EffectSettings>({ ...DEFAULT_EFFECT_SETTINGS });
   const [calibration, setCalibration] = useState(initialCalibration);
   const [calibrationSaved, setCalibrationSaved] = useState(false);
   const [compensation, setCompensation] = useState(DEFAULT_COMPENSATION);
-  const [profile, setProfile] = useState<string>(DEFAULT_PROFILE);
   const [yaw, setYaw] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [enabled, setEnabled] = useState(true);
@@ -145,7 +143,7 @@ export default function App() {
       const angle = signedYawDegrees(pose.current);
       const effect = effectAtAngle(angle, s.settings);
       const amount = s.enabled ? effect : { progress: 0, blur: 0, dim: 0 };
-      // All previews use the same 1:1 counterrotation, regardless of preset.
+      // All previews use the same 1:1 counterrotation.
       const rotation = s.enabled ? pose.current : IDENTITY;
       const depth = 390 * Math.abs(Math.sin(signedYawDegrees(rotation) * Math.PI / 180));
       // Choose the hinge that sends every other point behind the glass. The pivot itself stays at z=0.
@@ -212,7 +210,7 @@ export default function App() {
     hideAfterConnection.current = immersive;
     void sensor.enable();
   };
-  const update = (key: keyof EffectSettings, value: number) => { setSettings(s => ({ ...s, [key]: value })); setProfile('custom'); };
+  const update = (key: keyof EffectSettings, value: number) => setSettings(s => ({ ...s, [key]: value }));
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!event.isPrimary) {
       tap.current = null; lastTap.current = null; drag.current = null;
@@ -307,12 +305,7 @@ export default function App() {
           {(isConnected || isBusy) && <button className="text-button" onClick={manual}>切换到手动模拟</button>}
         </div>
 
-        <div className="section-label"><span>01</span><h3>选择一种感觉</h3></div>
-        <div className="presets" aria-label="效果预设">
-          {([['gentle', '轻盈', 'SUBTLE'], ['balanced', '平衡', 'BALANCED'], ['deep', '深邃', 'IMMERSIVE']] as const).map(([key, label, english]) => <button key={key} className={profile === key ? 'selected' : ''} aria-pressed={profile === key} onClick={() => { setProfile(key); setSettings({ ...profiles[key] }); }}><span>{label}{profile === key && <Check size={12} />}</span><small>{english}</small></button>)}
-        </div>
-
-        <div className="section-label tuning-label"><span>02</span><h3>微调空间</h3><button className="subtle-reset" onClick={() => { setSettings({ ...profiles[DEFAULT_PROFILE] }); setProfile(DEFAULT_PROFILE); setCompensation(DEFAULT_COMPENSATION); setCalibration({ ...DEFAULT_CALIBRATION }); }} aria-label="重置效果参数"><RotateCcw size={13} />还原</button></div>
+        <div className="section-label tuning-label"><h3>微调空间</h3><button className="subtle-reset" onClick={() => { setSettings({ ...DEFAULT_EFFECT_SETTINGS }); setCompensation(DEFAULT_COMPENSATION); setCalibration({ ...DEFAULT_CALIBRATION }); }} aria-label="重置效果参数"><RotateCcw size={13} />还原</button></div>
         <p className="geometry-note">手动与体感均为 1:1 反向旋转 · 左右各 80°</p>
         <Range label="拉伸补偿" value={compensation * 100} min={0} max={100} unit="%" onChange={v => setCompensation(v / 100)} hint="100% 按实际左右角度补偿；降低可减轻横向展开。" />
         <Range label="开始失焦" value={settings.threshold} min={0} max={28} unit="°" onChange={v => update('threshold', v)} />
