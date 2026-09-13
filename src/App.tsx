@@ -65,7 +65,7 @@ export default function App() {
   const [intro, setIntro] = useState(true);
   const [settings, setSettings] = useState<EffectSettings>({ ...DEFAULT_EFFECT_SETTINGS });
   const [calibration, setCalibration] = useState(initialCalibration);
-  const [compensation, setCompensation] = useState(DEFAULT_COMPENSATION);
+  const [compensation, setCompensation] = useState(1);
   const [perspectiveStrength, setPerspectiveStrength] = useState(DEFAULT_PERSPECTIVE_STRENGTH);
   const [desktopDimming, setDesktopDimming] = useState(DEFAULT_DIMMING_STRENGTH);
   const [yaw, setYaw] = useState(0);
@@ -246,7 +246,7 @@ export default function App() {
       const physicalRotation = modelPose.current;
       // At 100%, the observer follows the exact horizontal angle, including
       // turns above 45 degrees; pitch stays excluded from the whole scene.
-      const viewerRotation = compensatedViewerRotation(angle, 0, s.compensation);
+      const viewerRotation = compensatedViewerRotation(angle, 0, s.compensation * (mobilePreview ? DEFAULT_COMPENSATION : 1));
       const stageElement = device.current?.parentElement;
       const signature = [...rotation, ...viewerRotation, ...physicalRotation, amount.blur, amount.dim, scale, perspective, s.perspectiveStrength, Number(s.immersive), Number(hinge === 'right'), modelRevision.current,
         stageElement?.clientWidth ?? 0, stageElement?.clientHeight ?? 0, canvas.current?.clientHeight ?? 0,
@@ -422,7 +422,7 @@ export default function App() {
           {(isConnected || isBusy) && <button className="text-button" onClick={manual}>{t('切换到手动模拟')}</button>}
         </div>
 
-        <div className="section-label tuning-label"><h3>{t('微调空间')}</h3><button className="subtle-reset" onClick={() => { setSettings({ ...DEFAULT_EFFECT_SETTINGS }); setCompensation(DEFAULT_COMPENSATION); setPerspectiveStrength(DEFAULT_PERSPECTIVE_STRENGTH); setDesktopDimming(DEFAULT_DIMMING_STRENGTH); setCalibration({ ...DEFAULT_CALIBRATION }); }} aria-label={t('重置效果参数')}><RotateCcw size={13} />{t('还原')}</button><button className="panel-close tuning-close" onClick={() => setPanelOpen(false)} aria-label={t('关闭参数面板')}><X size={18} /></button></div>
+        <div className="section-label tuning-label"><h3>{t('微调空间')}</h3><button className="subtle-reset" onClick={() => { setSettings({ ...DEFAULT_EFFECT_SETTINGS }); setCompensation(1); setPerspectiveStrength(DEFAULT_PERSPECTIVE_STRENGTH); setDesktopDimming(DEFAULT_DIMMING_STRENGTH); setCalibration({ ...DEFAULT_CALIBRATION }); }} aria-label={t('重置效果参数')}><RotateCcw size={13} />{t('还原')}</button><button className="panel-close tuning-close" onClick={() => setPanelOpen(false)} aria-label={t('关闭参数面板')}><X size={18} /></button></div>
         <Range id="range-拉伸补偿" label={t('拉伸补偿')} value={compensation * 100} min={0} max={100} unit="%" onChange={v => setCompensation(v / 100)} />
         {mobilePreview
           ? <Range id="range-远侧收缩" label={t('远侧收缩')} value={perspectiveStrength * 100} min={0} max={200} unit="%" onChange={v => setPerspectiveStrength(v / 100)} />
@@ -465,3 +465,4 @@ export default function App() {
     {rendererError && (!immersive || controlsVisible) && <div className="render-notice" role="status">{t(rendererError)} {t('当前使用基础模糊预览。')}</div>}
   </div>;
 }
+
