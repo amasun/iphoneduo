@@ -57,7 +57,10 @@ export default function App() {
   const uiLanguage = mobilePreview ? 'zh' : language;
   const t = (text: string) => translate(text, uiLanguage);
   const [immersive, setImmersive] = useState(startsImmersive);
-  const [controlsVisible, setControlsVisible] = useState(() => !isMobilePreview());
+  // Mobile preview opens with the sensor start card visible so a scanned link
+  // can be activated immediately. Once connected, the card and controls hide;
+  // double-tapping the stage reveals them again.
+  const [controlsVisible, setControlsVisible] = useState(() => true);
   const [panelOpen, setPanelOpen] = useState(() => !startsImmersive());
   const [intro, setIntro] = useState(true);
   const [settings, setSettings] = useState<EffectSettings>({ ...DEFAULT_EFFECT_SETTINGS });
