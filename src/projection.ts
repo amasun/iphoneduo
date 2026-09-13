@@ -20,9 +20,6 @@ export function layoutScene(
   // App supplies a partially compensated observer, independent of the plane.
   // Zero compensation leaves a fixed eye for natural foreshortening.
   // Never move the eye to force either projected edge back onto the aperture.
-  // Keep the observer direction and distance coherent. The perspective
-  // distance scales the complete camera vector, so the viewing angle remains
-  // unchanged while the eye moves closer to or farther from the plane.
   const camera = transform(viewerRotation, [0, 0, perspective]);
   return {
     camera,
