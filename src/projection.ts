@@ -20,7 +20,13 @@ export function layoutScene(
   // App supplies a partially compensated observer, independent of the plane.
   // Zero compensation leaves a fixed eye for natural foreshortening.
   // Never move the eye to force either projected edge back onto the aperture.
-  const camera = transform(viewerRotation, [0, 0, perspective]);
+  // Keep the observer's lateral offset tied to a stable reference distance.
+  // If it were multiplied by the user-controlled perspective distance, moving
+  // the eye farther away would also change the apparent viewing angle and make
+  // the image tilt. Distance now affects depth (Z) only.
+  const referenceDistance = 40;
+  const referenceCamera = transform(viewerRotation, [0, 0, referenceDistance]);
+  const camera: Vector3 = [referenceCamera[0], referenceCamera[1], perspective];
   return {
     camera,
     imageSize: [imageWidth * fit, imageHeight * fit] as [number, number],
