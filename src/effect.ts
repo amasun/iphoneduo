@@ -9,7 +9,7 @@ export function effectAtAngle(angle: number, settings: EffectSettings) {
   const linear = Math.max(0, Math.min(1, (Math.abs(angle) - settings.threshold) / (52 - settings.threshold)));
   const progress = linear * linear * (3 - 2 * linear);
   const blur = Math.max(0, Math.min(MAX_BLUR, settings.blur)) * progress;
-  // Drive darkness from actual defocus, so reducing blur also restores light.
-  // The renderer applies this strength spatially, preserving the sharp hinge.
-  return { progress, blur, dim: 1 - Math.exp(-blur / 60) };
+  // Darkness follows the spatial transition independently of blur radius, so
+  // the far-side dimming control remains useful even when blur is 0px.
+  return { progress, blur, dim: 1 - Math.exp(-progress * 0.6) };
 }

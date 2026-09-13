@@ -21,13 +21,13 @@ test('defocus increases symmetrically and remains bounded', () => {
   }
 });
 
-test('darkness follows the chosen blur strength and disappears at zero blur', () => {
+test('darkness is independent from the chosen blur strength', () => {
   const settings = DEFAULT_EFFECT_SETTINGS;
-  assert.equal(effectAtAngle(52, { ...settings, blur: 0 }).dim, 0);
+  assert.ok(effectAtAngle(52, { ...settings, blur: 0 }).dim > 0);
   const strengths = [16, 24, 48, 96, 120].map(blur => effectAtAngle(52, { ...settings, blur }));
   for (let index = 1; index < strengths.length; index++) {
     assert.ok(strengths[index].blur > strengths[index - 1].blur);
-    assert.ok(strengths[index].dim > strengths[index - 1].dim);
+    assert.equal(strengths[index].dim, strengths[0].dim);
   }
   assert.deepEqual(effectAtAngle(52, { ...settings, blur: 200 }), strengths.at(-1));
 });
