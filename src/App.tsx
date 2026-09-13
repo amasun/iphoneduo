@@ -21,6 +21,8 @@ const wrapDegrees = (angle: number) => {
 };
 const DEFAULT_PERSPECTIVE_STRENGTH = 0.5;
 const DEFAULT_DIMMING_STRENGTH = 1;
+const DESKTOP_DEFAULT_DIMMING_STRENGTH = 1.6;
+const DESKTOP_DEFAULT_EFFECT_SETTINGS: EffectSettings = { ...DEFAULT_EFFECT_SETTINGS, blur: 24 };
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 const transpose = (m: number[]) => [m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]];
 const MOBILE_PREVIEW_QUERY = '(max-width: 759px), (max-height: 759px) and (hover: none) and (pointer: coarse)';
@@ -63,11 +65,11 @@ export default function App() {
   const [controlsVisible, setControlsVisible] = useState(() => true);
   const [panelOpen, setPanelOpen] = useState(() => !startsImmersive());
   const [intro, setIntro] = useState(true);
-  const [settings, setSettings] = useState<EffectSettings>({ ...DEFAULT_EFFECT_SETTINGS });
+  const [settings, setSettings] = useState<EffectSettings>(() => ({ ...(mobilePreview ? DEFAULT_EFFECT_SETTINGS : DESKTOP_DEFAULT_EFFECT_SETTINGS) }));
   const [calibration, setCalibration] = useState(initialCalibration);
   const [compensation, setCompensation] = useState(1);
   const [perspectiveStrength, setPerspectiveStrength] = useState(DEFAULT_PERSPECTIVE_STRENGTH);
-  const [desktopDimming, setDesktopDimming] = useState(DEFAULT_DIMMING_STRENGTH);
+  const [desktopDimming, setDesktopDimming] = useState(DESKTOP_DEFAULT_DIMMING_STRENGTH);
   const [yaw, setYaw] = useState(0);
   const [modelPitch, setModelPitch] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -422,7 +424,7 @@ export default function App() {
           {(isConnected || isBusy) && <button className="text-button" onClick={manual}>{t('切换到手动模拟')}</button>}
         </div>
 
-        <div className="section-label tuning-label"><h3>{t('微调空间')}</h3><button className="subtle-reset" onClick={() => { setSettings({ ...DEFAULT_EFFECT_SETTINGS }); setCompensation(1); setPerspectiveStrength(DEFAULT_PERSPECTIVE_STRENGTH); setDesktopDimming(DEFAULT_DIMMING_STRENGTH); setCalibration({ ...DEFAULT_CALIBRATION }); }} aria-label={t('重置效果参数')}><RotateCcw size={13} />{t('还原')}</button><button className="panel-close tuning-close" onClick={() => setPanelOpen(false)} aria-label={t('关闭参数面板')}><X size={18} /></button></div>
+        <div className="section-label tuning-label"><h3>{t('微调空间')}</h3><button className="subtle-reset" onClick={() => { setSettings({ ...(mobilePreview ? DEFAULT_EFFECT_SETTINGS : DESKTOP_DEFAULT_EFFECT_SETTINGS) }); setCompensation(1); setPerspectiveStrength(DEFAULT_PERSPECTIVE_STRENGTH); setDesktopDimming(mobilePreview ? DEFAULT_DIMMING_STRENGTH : DESKTOP_DEFAULT_DIMMING_STRENGTH); setCalibration({ ...DEFAULT_CALIBRATION }); }} aria-label={t('重置效果参数')}><RotateCcw size={13} />{t('还原')}</button><button className="panel-close tuning-close" onClick={() => setPanelOpen(false)} aria-label={t('关闭参数面板')}><X size={18} /></button></div>
         <Range id="range-拉伸补偿" label={t('拉伸补偿')} value={compensation * 100} min={0} max={100} unit="%" onChange={v => setCompensation(v / 100)} />
         {mobilePreview
           ? <Range id="range-远侧收缩" label={t('远侧收缩')} value={perspectiveStrength * 100} min={0} max={200} unit="%" onChange={v => setPerspectiveStrength(v / 100)} />
@@ -465,6 +467,8 @@ export default function App() {
     {rendererError && (!immersive || controlsVisible) && <div className="render-notice" role="status">{t(rendererError)} {t('当前使用基础模糊预览。')}</div>}
   </div>;
 }
+
+
 
 
 
