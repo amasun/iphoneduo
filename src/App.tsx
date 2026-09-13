@@ -65,7 +65,7 @@ export default function App() {
   const [controlsVisible, setControlsVisible] = useState(() => true);
   const [panelOpen, setPanelOpen] = useState(() => !startsImmersive());
   const [intro, setIntro] = useState(true);
-  const [settings, setSettings] = useState<EffectSettings>(() => ({ ...(mobilePreview ? DEFAULT_EFFECT_SETTINGS : DESKTOP_DEFAULT_EFFECT_SETTINGS) }));
+  const [settings, setSettings] = useState<EffectSettings>(() => ({ ...DESKTOP_DEFAULT_EFFECT_SETTINGS }));
   const [calibration, setCalibration] = useState(initialCalibration);
   const [compensation, setCompensation] = useState(1);
   const [perspectiveStrength, setPerspectiveStrength] = useState(DEFAULT_PERSPECTIVE_STRENGTH);
@@ -95,7 +95,7 @@ export default function App() {
   const hideAfterConnection = useRef(false);
   const lastHinge = useRef<'left' | 'right'>('left');
   const previewPerspective = mobilePreview ? perspectiveStrength : DEFAULT_PERSPECTIVE_STRENGTH;
-  const dimmingStrength = mobilePreview ? DEFAULT_DIMMING_STRENGTH : desktopDimming;
+  const dimmingStrength = desktopDimming;
   const frameState = useRef({ settings, calibration, compensation, perspectiveStrength: previewPerspective, dimmingStrength, yaw, modelPitch, playing, enabled, immersive, sensorActive: false, reducedMotion });
   frameState.current = { settings, calibration, compensation, perspectiveStrength: previewPerspective, dimmingStrength, yaw, modelPitch, playing, enabled, immersive, sensorActive: sensor.status === 'active' || sensor.status === 'waiting', reducedMotion };
   useImmersiveViewport(immersive);
@@ -238,7 +238,7 @@ export default function App() {
         window.screen.width, window.screen.height,
         s.immersive && (phoneBrowser || coarsePointer.matches),
       );
-      const perspective = perspectiveDistancePx(shortEdge, s.calibration);
+      const perspective = perspectiveDistancePx(shortEdge, mobilePreview ? { ...s.calibration, distanceCm: 40 } : s.calibration);
       // The chassis can complete horizontal laps, with a small pitch range.
       // The screen illusion retains its separate single-axis range.
       const physicalTarget = s.immersive || s.sensorActive
@@ -430,7 +430,7 @@ export default function App() {
           ? <Range id="range-远侧收缩" label={t('远侧收缩')} value={perspectiveStrength * 100} min={0} max={200} unit="%" onChange={v => setPerspectiveStrength(v / 100)} />
           : <Range id="range-远端压暗" label={t('远端压暗')} value={desktopDimming * 100} min={0} max={200} unit="%" onChange={v => setDesktopDimming(v / 100)} />}
         <Range id="range-开始失焦" label={t('开始失焦')} value={settings.threshold} min={0} max={28} unit="°" onChange={v => update('threshold', v)} />
-        <Range id="range-透视距离" label={t('透视距离')} value={calibration.distanceCm} min={20} max={100} unit="cm" onChange={v => setCalibration(c => ({ ...c, distanceCm: v }))} />
+        <Range id="range-透视距离" label={t('透视距离')} value={mobilePreview ? 40 : calibration.distanceCm} min={20} max={100} unit="cm" disabled={mobilePreview} onChange={v => setCalibration(c => ({ ...c, distanceCm: v }))} />
         <Range id="range-失焦程度" label={t('失焦程度')} value={settings.blur} min={0} max={MAX_BLUR} unit="px" onChange={v => update('blur', v)} />
 
         <div className="effect-switch-row"><div><span>{t('空间效果')}</span></div><button role="switch" aria-checked={enabled} aria-label={t('空间效果开关')} className={`switch ${enabled ? 'on' : ''}`} onClick={() => setEnabled(v => !v)}><span /></button></div>
@@ -467,6 +467,7 @@ export default function App() {
     {rendererError && (!immersive || controlsVisible) && <div className="render-notice" role="status">{t(rendererError)} {t('当前使用基础模糊预览。')}</div>}
   </div>;
 }
+
 
 
 
