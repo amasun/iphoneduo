@@ -403,7 +403,7 @@ export default function App() {
           </div>
           {!immersive && <canvas ref={modelCanvas} className="phone-model-canvas" role="img" aria-label={t('可旋转的 iPhone 17 Pro Max 三维模型，屏幕实时呈现倾斜效果')} aria-hidden={!modelAspect} />}
         </div>
-        <div className="preview-footer"><span><span className={`tiny-dot ${isConnected ? 'live' : ''}`} />{t('模拟 iPhone Duo 翻盖效果')}</span><button onClick={() => { setImmersive(true); setPanelOpen(false); setControlsVisible(!isMobilePreview()); }}><Expand size={16} />{t('iPhone 预览')}</button><button className="dashboard-settings" onClick={() => setPanelOpen(value => !value)} aria-label={t('打开效果调节')} aria-expanded={panelOpen} aria-controls="controls"><Settings2 size={18} /><span>{t('调节')}</span></button></div>
+        <div className="preview-footer"><span><span className={`tiny-dot ${isConnected ? 'live' : ''}`} />{t('模拟 iPhone Duo 翻盖效果')}</span></div>
 
         {!immersive && modelError && <p className="model-load-notice" role="status">{t(modelError)}</p>}
       </section>
@@ -417,7 +417,7 @@ export default function App() {
       <aside id="controls" className={`controls ${panelOpen && (!immersive || controlsVisible) ? 'panel-open' : ''}`} aria-label={t('效果调节')}>
 
         <div className="connection-card">
-          <button className="primary-button" onClick={isConnected ? reset : enableSensor} disabled={sensor.status === 'requesting'}>{isConnected ? <Crosshair size={17} /> : <MoveUpRight size={17} />}{isConnected ? t('重新校准正面') : isBusy ? t('重新连接体感') : t('启用手机体感')}</button>
+          <button className="primary-button" onClick={isConnected ? reset : () => { setImmersive(true); setPanelOpen(false); setControlsVisible(true); setIntro(true); }} disabled={sensor.status === 'requesting'}>{isConnected ? <Crosshair size={17} /> : <MoveUpRight size={17} />}{isConnected ? t('重新校准正面') : t('手机端现实测试')}</button>
           {sensor.status !== 'idle' && <p className={`sensor-message ${['denied', 'insecure', 'error'].includes(sensor.status) ? 'attention' : ''}`} role="status">{t(sensor.message)}</p>}
           {(isConnected || isBusy) && <button className="text-button" onClick={manual}>{t('切换到手动模拟')}</button>}
         </div>
@@ -435,7 +435,7 @@ export default function App() {
         <details className="instructions"><summary>{t('使用说明')}<ChevronDown size={14} /></summary><p>{t('拖动模型可左右自由旋转，上下俯仰限 ±10°，点击「回到正面」复位。')}</p><p>{t('在 iPhone Safari 中启用体感并允许访问。正对屏幕校准后，保持头部不动，缓慢左右转动手机。双击画面显示或隐藏控件。')}</p><p>{t(mobilePreview ? '拉伸补偿调节横向展开，远侧收缩调节近大远小。透视距离填写眼睛到屏幕的距离；失焦程度越高，模糊区域越暗。' : '拉伸补偿调节横向展开，透视距离填写眼睛到屏幕的距离。远端压暗控制模糊区域的明暗：0% 不压暗，100% 为原有强度，200% 加强压暗。它不改变图片透视或模糊程度；固定边缘保持明亮。')}</p><p><strong>{t('iPhone 全屏体验')}</strong><br />{t('用 Safari 打开本页，点击「分享」→「添加到主屏幕」→「添加」。如出现「作为 Web App 打开」，请保持开启。随后回到手机桌面，点击新添加的 INSIDE 图标，即可在没有 Safari 地址栏和工具栏的界面中体验。进入后双击画面显示控件，再启用体感。')}</p>{!immersive && <div className="model-attribution"><a href="https://sketchfab.com/3d-models/iphone-17-pro-max-87fc1df741384124a8ce0226d2b2058d" target="_blank" rel="noreferrer">iPhone 17 Pro Max</a><span>·</span><a href="https://sketchfab.com/MG990" target="_blank" rel="noreferrer">MajdyModels</a><span>·</span><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a><span>{t('· 实时屏幕改编')}</span></div>}</details>
         {!immersive && <a className="iphone-preview-qr" href="https://amasun.github.io/iphoneduo/" target="_blank" rel="noreferrer" aria-label={t('打开 iPhone 预览，或使用相机扫描二维码')}>
           <img src={`${BASE_URL}iphone-preview.svg`} width={128} height={128} alt={t('iPhone 预览二维码')} />
-          <div><strong>{t('iPhone 预览')}</strong><span>{t('相机扫码')}<br />{t('在 Safari 中打开')}</span></div>
+          <div><strong>{t('手机端现实测试')}</strong><span>{t('相机扫码')}<br />{t('在 Safari 中打开')}</span></div>
         </a>}
       </aside>
 
@@ -465,4 +465,6 @@ export default function App() {
     {rendererError && (!immersive || controlsVisible) && <div className="render-notice" role="status">{t(rendererError)} {t('当前使用基础模糊预览。')}</div>}
   </div>;
 }
+
+
 

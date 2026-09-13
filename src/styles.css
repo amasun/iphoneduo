@@ -309,3 +309,6 @@ body.immersive-viewport-active #root{position:relative;z-index:0;width:100%;heig
   .app:not(.is-immersive) :is(.controls,.simulation-panel,.preview-footer button){background:#ebebeb;backdrop-filter:none;-webkit-backdrop-filter:none}
 }
 @font-face{font-family:'Caveat';src:url('/iphoneduo/caveat-normal-600.woff2') format('woff2');font-weight:600;font-style:normal;font-display:swap}
+
+.app:not(.is-immersive) .topbar .language-switch{margin-left:auto}
+
